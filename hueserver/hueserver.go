@@ -4,11 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"text/template"
-	"time"
 
-	"github.com/facebookgo/httpdown"
 	"github.com/labstack/echo"
-	"github.com/labstack/echo/engine/standard"
 	"github.com/labstack/echo/middleware"
 )
 
@@ -90,16 +87,12 @@ type Server struct {
 	SetLightState func(id string, state LightStateChange) LightStateChangeResponse
 }
 
-func (server *Server) Start(port string) error {
-	hd := &httpdown.HTTP{
-		StopTimeout: 8 * time.Second,
-		KillTimeout: 2 * time.Second,
-	}
+func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	server.mux.ServeHTTP(w, r)
+}
 
-	httpSrv := standard.New(port)
-	httpSrv.SetHandler(server.mux)
-	httpSrv.TLSConfig = nil
-	return httpdown.ListenAndServe(httpSrv.Server, hd)
+func (server *Server) Start(port string) error {
+	return http.ListenAndServe(port, server)
 }
 
 func (server *Server) serveSetupXML(c echo.Context) error {
@@ -115,7 +108,8 @@ func (server *Server) getLight(c echo.Context) error {
 }
 
 func (server *Server) setLightState(c echo.Context) error {
-	decoder := json.NewDecoder(c.Request().Body())
+	defer c.Request().Body.Close()
+	decoder := json.NewDecoder(c.Request().Body)
 	state := &LightStateChange{}
 	if err := decoder.Decode(state); err != nil {
 		return err
@@ -138,7 +132,7 @@ func NewServer(uuid, urlBase, friendlyName string, getLights func() LightList, g
 	}
 
 	srv.mux.Use(middleware.Logger())
-	srv.mux.Get("/upnp/setup.xml", srv.serveSetupXML)
+	srv.mux.GET("/upnp/setup.xml", srv.serveSetupXML)
 	srv.mux.GET("/api/:userId", srv.getLights)
 	srv.mux.GET("/api/:userId/lights", srv.getLights)
 	srv.mux.PUT("/api/:userId/lights/:lightId/state", srv.setLightState)
