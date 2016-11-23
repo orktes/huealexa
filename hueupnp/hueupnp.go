@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	upnpMulticastAddress = "239.255.255.250:1900"
+	upnpMulticastAddress = "239.255.255.250"
 )
 
 /**
@@ -37,8 +37,8 @@ USN: uuid:{{.uuid}}::urn:Belkin:device:**
 `))
 
 // CreateUPNPResponder takes in the setupLocation http://[IP]:[POST]/upnp/setup.xml
-func CreateUPNPResponder(setupLocation string, uuid string) {
-	addr, err := net.ResolveUDPAddr("udp", upnpMulticastAddress)
+func CreateUPNPResponder(setupLocation string, uuid string, upnpPort string) {
+	addr, err := net.ResolveUDPAddr("udp", upnpMulticastAddress+upnpPort)
 	if err != nil {
 		log.Fatal(err)
 	}
