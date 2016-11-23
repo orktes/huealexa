@@ -92,7 +92,10 @@ func main() {
 		panic(err)
 	}
 
-	vm.Run(string(script))
+	_, err = vm.Run(string(script))
+	if err != nil {
+		panic(err)
+	}
 
 	getLights := func() hueserver.LightList {
 		value, err := vm.Run(`JSON.stringify(getLights());`)
