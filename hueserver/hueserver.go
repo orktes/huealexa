@@ -3,7 +3,6 @@ package hueserver
 import (
 	"encoding/json"
 	"net/http"
-	"os"
 	"text/template"
 	"time"
 
@@ -104,7 +103,6 @@ func (server *Server) Start(port string) error {
 }
 
 func (server *Server) serveSetupXML(c echo.Context) error {
-	setupTemplate.Execute(os.Stdout, server)
 	return setupTemplate.Execute(c.Response().Writer(), server)
 }
 
