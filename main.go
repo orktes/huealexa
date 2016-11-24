@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os/exec"
 
@@ -95,7 +96,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	
 
 	getLights := func() hueserver.LightList {
 		value, err := vm.RunString(`JSON.stringify(getLights());`)
