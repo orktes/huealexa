@@ -9,6 +9,8 @@ import (
 	"os/exec"
 
 	"github.com/dop251/goja"
+	"github.com/dop251/goja_nodejs/console"
+	"github.com/dop251/goja_nodejs/require"
 	uuid "github.com/nu7hatch/gouuid"
 	"github.com/orktes/huessimo/hueserver"
 	"github.com/orktes/huessimo/hueupnp"
@@ -67,24 +69,22 @@ func main() {
 		return
 	}
 
+	registry := new(require.Registry)
 	vm := goja.New()
+	registry.Enable(vm)
+	console.Enable(vm)
 
 	vm.Set("exec", func(call goja.FunctionCall) goja.Value {
 		cmd := call.Argument(0).String()
 
 		fmt.Printf("[JS][SH]: %s\n", cmd)
 
-		out, err := exec.Command("sh", "-c", cmd).Output()
-		if err != nil {
+		out, outErr := exec.Command("sh", "-c", cmd).Output()
+		if outErr != nil {
 			panic(err)
 		}
 
 		return vm.ToValue(string(out))
-	})
-
-	vm.Set("print", func(call goja.FunctionCall) goja.Value {
-		fmt.Printf("[JS] %s.\n", call.Argument(0).String())
-		return vm.ToValue(nil)
 	})
 
 	script, err := ioutil.ReadFile(*scriptSrcPtr)

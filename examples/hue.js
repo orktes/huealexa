@@ -14,4 +14,4 @@ function setLightState(id, state) {
 }
 
 
-print('Script loaded');
+console.log('Script loaded');

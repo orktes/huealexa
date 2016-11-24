@@ -26,8 +26,8 @@ function setLightState(id, state) {
   var success = {};
   light.state.on = state.on;
   success["/lights/" + id + "/state/on"] = state.on;
-  print("Light state is now " + state.on);
+  console.log("Light state is now " + state.on);
   return [{success: success}];
 }
 
-print('Script loaded');
+console.log('Script loaded');
