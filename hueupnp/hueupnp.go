@@ -92,7 +92,7 @@ func CreateUPNPResponder(setupLocation string, uuid string, upnpAddr string) {
 	defer rawCon.Close()
 
 	for {
-		b := make([]byte, 1024)
+		b := make([]byte, 2048)
 		n, src, err := rawCon.ReadFrom(b)
 		if err != nil {
 			log.Fatal("[UPNP] ReadFromUDP failed:", err)
