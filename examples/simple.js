@@ -1,4 +1,4 @@
-// All require paths are relative to the root dir (this will be fiexed)
+// All require paths are relative to the CWD (this will be fiexed)
 var light = require('examples/util.js').getLight('Testing');
 
 function getLights() {
