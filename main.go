@@ -70,7 +70,7 @@ func main() {
 
 	registry := new(require.Registry)
 	vm := goja.New()
-	req := registry.Enable(vm)
+	registry.Enable(vm)
 	console.Enable(vm)
 
 	vm.Set("exec", func(call goja.FunctionCall) goja.Value {
@@ -86,22 +86,16 @@ func main() {
 		return vm.ToValue(string(out))
 	})
 
-	_, err = req.Require(*scriptSrcPtr)
+	script, err := ioutil.ReadFile(*scriptSrcPtr)
 	if err != nil {
 		panic(err)
 	}
 
-	/*
-		script, err := ioutil.ReadFile(*scriptSrcPtr)
-		if err != nil {
-			panic(err)
-		}
-
-		_, err = vm.RunString(string(script))
-		if err != nil {
-			panic(err)
-		}
-	*/
+	_, err = vm.RunString(string(script))
+	if err != nil {
+		panic(err)
+	}
+	
 
 	getLights := func() hueserver.LightList {
 		value, err := vm.RunString(`JSON.stringify(getLights());`)
