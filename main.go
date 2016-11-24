@@ -8,10 +8,10 @@ import (
 	"net"
 	"os/exec"
 
+	"github.com/dop251/goja"
 	uuid "github.com/nu7hatch/gouuid"
 	"github.com/orktes/huessimo/hueserver"
 	"github.com/orktes/huessimo/hueupnp"
-	"github.com/robertkrimen/otto"
 )
 
 func getIPAddress() string {
@@ -67,9 +67,9 @@ func main() {
 		return
 	}
 
-	vm := otto.New()
+	vm := goja.New()
 
-	vm.Set("exec", func(call otto.FunctionCall) otto.Value {
+	vm.Set("exec", func(call goja.FunctionCall) goja.Value {
 		cmd := call.Argument(0).String()
 
 		fmt.Printf("[JS][SH]: %s\n", cmd)
@@ -79,13 +79,12 @@ func main() {
 			panic(err)
 		}
 
-		val, _ := otto.ToValue(string(out))
-		return val
+		return vm.ToValue(string(out))
 	})
 
-	vm.Set("print", func(call otto.FunctionCall) otto.Value {
+	vm.Set("print", func(call goja.FunctionCall) goja.Value {
 		fmt.Printf("[JS] %s.\n", call.Argument(0).String())
-		return otto.Value{}
+		return vm.ToValue(nil)
 	})
 
 	script, err := ioutil.ReadFile(*scriptSrcPtr)
@@ -93,21 +92,18 @@ func main() {
 		panic(err)
 	}
 
-	_, err = vm.Run(string(script))
+	_, err = vm.RunString(string(script))
 	if err != nil {
 		panic(err)
 	}
 
 	getLights := func() hueserver.LightList {
-		value, err := vm.Run(`JSON.stringify(getLights());`)
+		value, err := vm.RunString(`JSON.stringify(getLights());`)
 		if err != nil {
 			panic(err)
 		}
 
-		str, err := value.ToString()
-		if err != nil {
-			panic(err)
-		}
+		str := value.String()
 
 		list := &hueserver.LightList{}
 		json.Unmarshal([]byte(str), list)
@@ -119,15 +115,12 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		value, err := vm.Run(`JSON.stringify(getLight(` + string(arg) + `));`)
+		value, err := vm.RunString(`JSON.stringify(getLight(` + string(arg) + `));`)
 		if err != nil {
 			panic(err)
 		}
 
-		str, err := value.ToString()
-		if err != nil {
-			panic(err)
-		}
+		str := value.String()
 
 		light := &hueserver.Light{}
 		json.Unmarshal([]byte(str), light)
@@ -145,15 +138,12 @@ func main() {
 			panic(err)
 		}
 
-		value, err := vm.Run(`JSON.stringify(setLightState(` + string(arg) + `, ` + string(arg2) + `));`)
+		value, err := vm.RunString(`JSON.stringify(setLightState(` + string(arg) + `, ` + string(arg2) + `));`)
 		if err != nil {
 			panic(err)
 		}
 
-		str, err := value.ToString()
-		if err != nil {
-			panic(err)
-		}
+		str := value.String()
 
 		resp := &hueserver.LightStateChangeResponse{}
 		json.Unmarshal([]byte(str), resp)
