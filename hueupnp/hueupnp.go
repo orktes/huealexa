@@ -58,6 +58,8 @@ func CreateUPNPResponder(setupLocation string, uuid string, upnpAddr string) {
 				log.Fatal("[UPNP] DialUDP failed:", err)
 			}
 
+			defer c.Close()
+
 			log.Println("[UPNP] discovery request from", src)
 
 			b := &bytes.Buffer{}
