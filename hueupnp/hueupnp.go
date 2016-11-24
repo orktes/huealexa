@@ -1,13 +1,6 @@
 package hueupnp
 
-import (
-	"bytes"
-	"fmt"
-	"log"
-	"net"
-	"strings"
-	"text/template"
-)
+import "github.com/king-jam/gossdp"
 
 /**
 stolen from amazon-echo-ha-bridge
@@ -21,7 +14,7 @@ String discoveryTemplate = "HTTP/1.1 200 OK\r\n" +
 			"ST: urn:schemas-upnp-org:device:basic:1\r\n" +
 			"USN: uuid:Socket-1_0-221438K0100073::urn:Belkin:device:**\r\n\r\n";
 **/
-
+/*
 var upnpTemplate = template.Must(template.New("upnp").Parse(`HTTP/1.1 200 OK
 CACHE-CONTROL: max-age=86400
 EXT:
@@ -31,42 +24,42 @@ ST: urn:schemas-upnp-org:device:basic:1
 USN: uuid:{{.uuid}}::urn:Belkin:device:**
 
 `))
+*/
+/*
+HTTP/1.1 200 OK\r\n\
+CACHE-CONTROL: max-age=100\r\n\
+EXT:\r\n\
+LOCATION: http://" + ip + ":" + port + "/description.xml\r\n\
+SERVER: FreeRTOS/6.0.5, UPnP/1.0, IpBridge/0.1\r\n\
+ST: upnp:rootdevice\r\n\
+USN: uuid:2fa00080-d000-11e1-9b23-001f80007bbe::upnp:rootdevice\r\n
+*/
 
 // CreateUPNPResponder takes in the setupLocation http://[IP]:[POST]/upnp/setup.xml
-func CreateUPNPResponder(setupLocation string, uuid string, upnpAddr string) {
-	addr, err := net.ResolveUDPAddr("udp", upnpAddr)
+func CreateUPNPResponder(setupLocation string, uuid string) *gossdp.Ssdp {
+	s, err := gossdp.NewSsdp(nil)
 	if err != nil {
-		log.Fatal(err)
-	}
-	l, err := net.ListenMulticastUDP("udp", nil, addr)
-	if err != nil {
-		log.Fatal("[UPNP] ListenMulticastUDP failed:", err)
+		panic(err)
 	}
 
-	l.SetReadBuffer(1024)
-
-	for {
-		b := make([]byte, 1024)
-		n, src, err := l.ReadFromUDP(b)
-		if err != nil {
-			log.Fatal("[UPNP] ReadFromUDP failed:", err)
-		}
-
-		if strings.HasPrefix(string(b[:n]), "M-SEARCH * HTTP/1.1") && strings.Contains(string(b[:n]), "MAN: \"ssdp:discover\"") {
-			c, err := net.DialUDP("udp", nil, src)
-			if err != nil {
-				log.Fatal("[UPNP] DialUDP failed:", err)
-			}
-
-			log.Println("[UPNP] discovery request from", src)
-
-			b := &bytes.Buffer{}
-			err = upnpTemplate.Execute(b, map[string]string{"location": setupLocation, "uuid": uuid})
-			if err != nil {
-				log.Fatal("[UPNP] execute template failed:", err)
-			}
-			fmt.Printf("[UPNP] Sending\n%s\nto %s\n", b.Bytes(), src)
-			c.Write(b.Bytes())
-		}
+	belkinDef := gossdp.AdvertisableServer{
+		ServiceType: "urn:schemas-upnp-org:device:basic:1",
+		DeviceUuid:  "uuid:" + uuid + "::urn:Belkin:device:**",
+		Location:    setupLocation,
+		MaxAge:      86400,
 	}
+
+	s.AdvertiseServer(belkinDef)
+
+	hueDef := gossdp.AdvertisableServer{
+
+		ServiceType: "upnp:rootdevice",
+		DeviceUuid:  "uuid:" + uuid + "::upnp:rootdevice",
+		Location:    setupLocation,
+		MaxAge:      86400,
+	}
+
+	s.AdvertiseServer(hueDef)
+
+	return s
 }
