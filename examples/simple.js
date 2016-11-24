@@ -1,18 +1,5 @@
-var light = {
-  "etag":"03e7d1d9643d16c750427155032ce2d5",
-  "hascolor":true,
-  "manufacturer":"OSRAM",
-  "modelid":"Classic A60 TW",
-  "name":"Testing",
-  "pointsymbol":{},
-  "state":{
-    "on":true,
-    "reachable":true
-   },
-   "swversion":"V1.03.07",
-   "type":"Color temperature light",
-   "uniqueid":"84:18:26:00:00:CA:56:E3-03"
- };
+// All require paths are relative to the root dir (this will be fiexed)
+var light = require('examples/util.js').getLight('Testing');
 
 function getLights() {
   return {"1": light}
