@@ -9,10 +9,6 @@ import (
 	"text/template"
 )
 
-const (
-	upnpMulticastAddress = "239.255.255.250"
-)
-
 /**
 stolen from amazon-echo-ha-bridge
 
@@ -37,8 +33,8 @@ USN: uuid:{{.uuid}}::urn:Belkin:device:**
 `))
 
 // CreateUPNPResponder takes in the setupLocation http://[IP]:[POST]/upnp/setup.xml
-func CreateUPNPResponder(setupLocation string, uuid string, upnpPort string) {
-	addr, err := net.ResolveUDPAddr("udp", upnpMulticastAddress+upnpPort)
+func CreateUPNPResponder(setupLocation string, uuid string, upnpAddr string) {
+	addr, err := net.ResolveUDPAddr("udp", upnpAddr)
 	if err != nil {
 		log.Fatal(err)
 	}

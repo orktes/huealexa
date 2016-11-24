@@ -56,7 +56,7 @@ func main() {
 	scriptSrcPtr := flag.String("src", "", "Script source file location")
 	uuidPtr := flag.String("uuid", "", "UUID for the HUE server (for example \""+uuid.String()+"\")")
 	portPtr := flag.String("port", "8989", "Port for the HUE server")
-	upnpPortPtr := flag.String("upnp", "1900", "UPNP multicast port for the HUE server")
+	upnpPortPtr := flag.String("upnp", "239.255.255.250:1900", "UPNP multicast addr for the HUE server")
 	namePtr := flag.String("name", "fakeServer", "Name for the HUE server")
 	ipPtr := flag.String("ip", getIPAddress(), "Interface to be used")
 
