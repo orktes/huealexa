@@ -2,11 +2,14 @@ package hueupnp
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"strings"
 	"text/template"
+
+	"golang.org/x/net/ipv4"
 )
 
 /**
@@ -32,33 +35,74 @@ USN: uuid:{{.uuid}}::urn:Belkin:device:**
 
 `))
 
-// CreateUPNPResponder takes in the setupLocation http://[IP]:[POST]/upnp/setup.xml
-func CreateUPNPResponder(setupLocation string, uuid string, upnpAddr string) {
-	addr, err := net.ResolveUDPAddr("udp", upnpAddr)
+func createSocket() (*ipv4.PacketConn, net.PacketConn, error) {
+	group := net.IPv4(239, 255, 255, 250)
+	interfaces, err := net.Interfaces()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("net.Interfaces error: %s", err)
+		return nil, nil, err
 	}
-	l, err := net.ListenMulticastUDP("udp", nil, addr)
+	con, err := net.ListenPacket("udp4", "0.0.0.0:1900")
 	if err != nil {
-		log.Fatal("[UPNP] ListenMulticastUDP failed:", err)
+		log.Fatalf("net.ListenPacket error: %s", err)
+		return nil, nil, err
+	}
+	p := ipv4.NewPacketConn(con)
+	p.SetMulticastLoopback(true)
+	didFindInterface := false
+	for i, v := range interfaces {
+		ef, err := v.Addrs()
+		if err != nil {
+			continue
+		}
+		hasRealAddress := false
+		for k := range ef {
+			asIp := net.ParseIP(ef[k].String())
+			if asIp.IsUnspecified() {
+				continue
+			}
+			hasRealAddress = true
+			break
+		}
+		if !hasRealAddress {
+			continue
+		}
+		err = p.JoinGroup(&v, &net.UDPAddr{IP: group})
+		if err != nil {
+			log.Printf("join group %d %s", i, err)
+			continue
+		}
+		didFindInterface = true
+	}
+	if !didFindInterface {
+		return nil, nil, errors.New("Unable to find a compatible network interface!")
 	}
 
-	l.SetReadBuffer(1024)
+	return p, con, nil
+}
+
+// CreateUPNPResponder takes in the setupLocation http://[IP]:[POST]/upnp/setup.xml
+func CreateUPNPResponder(setupLocation string, uuid string, upnpAddr string) {
+	sock, rawCon, err := createSocket()
+	if err != nil {
+		panic(err)
+	}
+
+	defer sock.Close()
+	defer rawCon.Close()
 
 	for {
 		b := make([]byte, 1024)
-		n, src, err := l.ReadFromUDP(b)
+		n, src, err := rawCon.ReadFrom(b)
 		if err != nil {
 			log.Fatal("[UPNP] ReadFromUDP failed:", err)
 		}
 
 		if strings.HasPrefix(string(b[:n]), "M-SEARCH * HTTP/1.1") && strings.Contains(string(b[:n]), "MAN: \"ssdp:discover\"") {
-			c, err := net.DialUDP("udp", nil, src)
+			addr, err := net.ResolveUDPAddr("udp4", src.String())
 			if err != nil {
 				log.Fatal("[UPNP] DialUDP failed:", err)
 			}
-
-			defer c.Close()
 
 			log.Println("[UPNP] discovery request from", src)
 
@@ -68,7 +112,8 @@ func CreateUPNPResponder(setupLocation string, uuid string, upnpAddr string) {
 				log.Fatal("[UPNP] execute template failed:", err)
 			}
 			fmt.Printf("[UPNP] Sending\n%s\nto %s\n", b.Bytes(), src)
-			c.Write(b.Bytes())
+			rawCon.WriteTo([]byte(b.String()), addr)
 		}
 	}
+
 }
