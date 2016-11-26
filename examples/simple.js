@@ -1,20 +1,13 @@
-// All require paths are relative to the CWD (this will be fiexed)
-var light = require('examples/util.js').getLight('Testing');
+var registry = require('registry');
+var exec = require('process').exec;
 
-function getLights() {
-  return {"1": light}
-}
+registry.addDevice(registry.createDevice('Testing', registry.DimmableLamp, function (state) {
+  console.log('State changed - ' + JSON.stringify(state));
+}));
 
-function getLight(id) {
-  return light;
-}
+registry.addDevice(registry.createDevice('Second', registry.DimmableLamp, function (state) {
+  console.log('State changed - ' + JSON.stringify(state));
+}));
 
-function setLightState(id, state) {
-  var success = {};
-  light.state.on = state.on;
-  success["/lights/" + id + "/state/on"] = state.on;
-  console.log("Light state is now " + state.on);
-  return [{success: success}];
-}
-
-console.log('Script loaded');
+// Try out a bash command
+console.log(exec("echo Script loaded"));

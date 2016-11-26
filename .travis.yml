@@ -1,5 +1,6 @@
 language: go
 script:
+  - go generate
   - env GOOS=linux GOARCH=arm go build -v
   - mv huessimo huessimo_raspberrypi
 deploy:

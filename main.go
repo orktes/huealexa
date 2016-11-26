@@ -1,12 +1,14 @@
 package main
 
+//go:generate go-bindata -pkg lib -ignore=\.go  -o lib/assets.go lib/...
+
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os/exec"
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
@@ -14,6 +16,7 @@ import (
 	uuid "github.com/nu7hatch/gouuid"
 	"github.com/orktes/huessimo/hueserver"
 	"github.com/orktes/huessimo/hueupnp"
+	"github.com/orktes/huessimo/lib"
 )
 
 func getIPAddress() string {
@@ -49,14 +52,23 @@ func getIPAddress() string {
 	return ""
 }
 
+func srcLoader(pathname string) ([]byte, error) {
+	asset, err := lib.Asset("lib/" + pathname + ".js")
+	if err == nil {
+		return asset, nil
+	}
+
+	return nil, errors.New("Package " + pathname + " not found")
+}
+
 func main() {
-	uuid, err := uuid.NewV4()
+	genuuid, err := uuid.NewV4()
 	if err != nil {
 		panic(err)
 	}
 
 	scriptSrcPtr := flag.String("src", "", "Script source file location")
-	uuidPtr := flag.String("uuid", "", "UUID for the HUE server (for example \""+uuid.String()+"\")")
+	uuidPtr := flag.String("uuid", "", "UUID for the HUE server (for example \""+genuuid.String()+"\")")
 	portPtr := flag.String("port", "8989", "Port for the HUE server")
 	upnpPortPtr := flag.String("upnp", "239.255.255.250:1900", "UPNP multicast addr for the HUE server")
 	namePtr := flag.String("name", "fakeServer", "Name for the HUE server")
@@ -65,27 +77,20 @@ func main() {
 	flag.Parse()
 
 	if *uuidPtr == "" {
-		fmt.Printf("You must provide -uuid=\"%s\" (i just generated that for you) or something else\n", uuid.String())
+		fmt.Printf("You must provide -uuid=\"%s\" (i just generated that for you) or something else\n", genuuid.String())
 		return
 	}
 
-	registry := new(require.Registry)
+	if *ipPtr == "" {
+		fmt.Printf(`You must provide -ip=\"\11.22.33.44\"\n`)
+		return
+	}
+
+	registry := require.NewRegistryWithLoader(srcLoader)
 	vm := goja.New()
 	registry.Enable(vm)
 	console.Enable(vm)
-
-	vm.Set("exec", func(call goja.FunctionCall) goja.Value {
-		cmd := call.Argument(0).String()
-
-		fmt.Printf("[JS][SH]: %s\n", cmd)
-
-		out, outErr := exec.Command("sh", "-c", cmd).Output()
-		if outErr != nil {
-			panic(outErr)
-		}
-
-		return vm.ToValue(string(out))
-	})
+	lib.Register(vm)
 
 	script, err := ioutil.ReadFile(*scriptSrcPtr)
 	if err != nil {
@@ -98,7 +103,7 @@ func main() {
 	}
 
 	getLights := func() hueserver.LightList {
-		value, err := vm.RunString(`JSON.stringify(getLights());`)
+		value, err := vm.RunString(`JSON.stringify(require('registry')._getLights());`)
 		if err != nil {
 			panic(err)
 		}
@@ -115,7 +120,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		value, err := vm.RunString(`JSON.stringify(getLight(` + string(arg) + `));`)
+		value, err := vm.RunString(`JSON.stringify(require('registry')._getLight(` + string(arg) + `));`)
 		if err != nil {
 			panic(err)
 		}
@@ -138,7 +143,7 @@ func main() {
 			panic(err)
 		}
 
-		value, err := vm.RunString(`JSON.stringify(setLightState(` + string(arg) + `, ` + string(arg2) + `));`)
+		value, err := vm.RunString(`JSON.stringify(require('registry')._setLightState(` + string(arg) + `, ` + string(arg2) + `));`)
 		if err != nil {
 			panic(err)
 		}
@@ -153,5 +158,9 @@ func main() {
 	go hueupnp.CreateUPNPResponder("http://"+*ipPtr+":"+*portPtr+"/upnp/setup.xml", *uuidPtr, *upnpPortPtr)
 
 	srv := hueserver.NewServer(*uuidPtr, *ipPtr+":"+*portPtr, *namePtr, getLights, getLight, setLightState)
-	srv.Start(":" + *portPtr)
+	err = srv.Start(":" + *portPtr)
+	if err != nil {
+		panic(err)
+	}
+
 }
