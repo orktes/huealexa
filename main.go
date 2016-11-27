@@ -97,7 +97,7 @@ func main() {
 		panic(err)
 	}
 
-	_, err = vm.RunString(string(script))
+	_, err = vm.RunScript(*scriptSrcPtr, string(script))
 	if err != nil {
 		panic(err)
 	}
