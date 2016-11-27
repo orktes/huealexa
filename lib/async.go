@@ -29,7 +29,7 @@ func CreateAsyncNativeCallbackChannel() (int64, chan goja.FunctionCall) {
 func CreateAsyncJSFunction(orgCall func(goja.FunctionCall) goja.Value, vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
 	return func(call goja.FunctionCall) goja.Value {
 		go func(call goja.FunctionCall) {
-			callbackID := call.Argument(0).ToInteger()
+			callbackID := call.Argument(len(call.Arguments) - 1).ToInteger()
 			defer func() {
 				if r := recover(); r != nil {
 					vm.RunString(fmt.Sprintf(`require('async')._native_callback(%d, new Error('%s'), null, true);`, callbackID, r))

@@ -136,8 +136,8 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		callback := <-cbCh
-		str := callback.Argument(0).String()
+
+		str := (<-cbCh).Argument(0).String()
 
 		light := &hueserver.Light{}
 		json.Unmarshal([]byte(str), light)
