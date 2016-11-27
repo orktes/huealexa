@@ -1,14 +1,16 @@
 var registry = require('registry');
 var exec = require('process').exec;
 
-registry.addDevice(registry.createDevice('Testing', registry.DimmableLamp, function (state) {
+registry.addDevice(registry.createDevice('Testing', registry.DimmableLamp, function (state, cb) {
   console.log('State changed - ' + JSON.stringify(state));
+  return cb();
 }));
 
-registry.addDevice(registry.createDevice('Second', registry.DimmableLamp, function (state) {
+registry.addDevice(registry.createDevice('Second', registry.DimmableLamp, function (state, cb) {
   console.log('State changed - ' + JSON.stringify(state));
+  return cb();
 }));
-
+/*
 // Try out a bash command
 console.log(exec("echo Script loaded"));
 
@@ -19,3 +21,4 @@ require('devices/tv/viera').discoverDevices(function (devices) {
     registry.addDevice(devices[0].createDevice('Apple TV', 'NRC_CHG_INPUT-ONOFF', 'NRC_TV-ONOFF'));
   }
 });
+*/

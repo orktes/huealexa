@@ -8,7 +8,7 @@ import (
 )
 
 func initProcess(vm *goja.Runtime) {
-	vm.Set("_native_exec", func(call goja.FunctionCall) goja.Value {
+	fn := func(call goja.FunctionCall) goja.Value {
 		cmd := call.Argument(0).String()
 
 		log.Printf("[JS][SH]: %s\n", cmd)
@@ -19,5 +19,7 @@ func initProcess(vm *goja.Runtime) {
 		}
 
 		return vm.ToValue(string(out))
-	})
+	}
+	vm.Set("_native_exec", fn)
+	VMSetAsyncFunction(vm, "_native_exec_async", fn)
 }

@@ -103,12 +103,18 @@ func main() {
 	}
 
 	getLights := func() hueserver.LightList {
-		value, err := vm.RunString(`JSON.stringify(require('registry')._getLights());`)
+		callbackID, cbCh := lib.CreateAsyncNativeCallbackChannel()
+
+		_, err = vm.RunString(fmt.Sprintf(`
+        require('registry')._getLights(
+          require('async').createJSCallback(%d, true)
+        );
+    `, callbackID))
 		if err != nil {
 			panic(err)
 		}
 
-		str := value.String()
+		str := (<-cbCh).Argument(0).String()
 
 		list := &hueserver.LightList{}
 		json.Unmarshal([]byte(str), list)
@@ -116,16 +122,22 @@ func main() {
 	}
 
 	getLight := func(id string) hueserver.Light {
-		arg, err := json.Marshal(id)
+		arg, merr := json.Marshal(id)
+		if merr != nil {
+			panic(merr)
+		}
+		callbackID, cbCh := lib.CreateAsyncNativeCallbackChannel()
+		_, err = vm.RunString(fmt.Sprintf(`
+      require('registry')._getLight(
+        %s,
+        require('async').createJSCallback(%d, true)
+      );
+    `, string(arg), callbackID))
 		if err != nil {
 			panic(err)
 		}
-		value, err := vm.RunString(`JSON.stringify(require('registry')._getLight(` + string(arg) + `));`)
-		if err != nil {
-			panic(err)
-		}
-
-		str := value.String()
+		callback := <-cbCh
+		str := callback.Argument(0).String()
 
 		light := &hueserver.Light{}
 		json.Unmarshal([]byte(str), light)
@@ -133,22 +145,33 @@ func main() {
 	}
 
 	setLightState := func(id string, state hueserver.LightStateChange) hueserver.LightStateChangeResponse {
-		arg, err := json.Marshal(id)
+		arg, merr := json.Marshal(id)
+		if merr != nil {
+			panic(merr)
+		}
+
+		arg2, merr := json.Marshal(state)
+		if merr != nil {
+			panic(merr)
+		}
+
+		callbackID, cbCh := lib.CreateAsyncNativeCallbackChannel()
+		_, err = vm.RunString(fmt.Sprintf(`
+      require('registry')._setLightState(
+        %s,
+        %s,
+        require('async').createJSCallback(%d, true)
+      );
+    `,
+			string(arg),
+			string(arg2),
+			callbackID,
+		))
 		if err != nil {
 			panic(err)
 		}
 
-		arg2, err := json.Marshal(state)
-		if err != nil {
-			panic(err)
-		}
-
-		value, err := vm.RunString(`JSON.stringify(require('registry')._setLightState(` + string(arg) + `, ` + string(arg2) + `));`)
-		if err != nil {
-			panic(err)
-		}
-
-		str := value.String()
+		str := (<-cbCh).Argument(0).String()
 
 		resp := &hueserver.LightStateChangeResponse{}
 		json.Unmarshal([]byte(str), resp)
