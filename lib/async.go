@@ -32,7 +32,7 @@ func CreateAsyncJSFunction(orgCall func(goja.FunctionCall) goja.Value, vm *goja.
 			callbackID := call.Argument(0).ToInteger()
 			defer func() {
 				if r := recover(); r != nil {
-					vm.RunString(fmt.Sprintf(`require('async')._native_callback(%d, new Error('%s'));`, callbackID, r))
+					vm.RunString(fmt.Sprintf(`require('async')._native_callback(%d, new Error('%s'), null, true);`, callbackID, r))
 				}
 			}()
 			res := orgCall(goja.FunctionCall{Arguments: call.Arguments[:len(call.Arguments)-1]})
@@ -41,7 +41,7 @@ func CreateAsyncJSFunction(orgCall func(goja.FunctionCall) goja.Value, vm *goja.
 				panic(merr)
 			}
 
-			vm.RunString(fmt.Sprintf(`require('async')._native_callback(%d, null, %s);`, callbackID, string(data)))
+			vm.RunString(fmt.Sprintf(`require('async')._native_callback(%d, null, %s, null, true);`, callbackID, string(data)))
 		}(call)
 
 		return goja.Null()
