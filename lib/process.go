@@ -7,7 +7,7 @@ import (
 	"github.com/dop251/goja"
 )
 
-func initProcess(vm *goja.Runtime) {
+func initProcess(vm *VM) {
 	fn := func(call goja.FunctionCall) goja.Value {
 		cmd := call.Argument(0).String()
 

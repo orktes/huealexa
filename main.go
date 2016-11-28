@@ -87,9 +87,9 @@ func main() {
 	}
 
 	registry := require.NewRegistryWithLoader(srcLoader)
-	vm := goja.New()
-	registry.Enable(vm)
-	console.Enable(vm)
+	vm := &lib.VM{Runtime: goja.New()}
+	registry.Enable(vm.Runtime)
+	console.Enable(vm.Runtime)
 	lib.Register(vm)
 
 	script, err := ioutil.ReadFile(*scriptSrcPtr)

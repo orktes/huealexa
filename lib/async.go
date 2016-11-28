@@ -26,7 +26,7 @@ func CreateAsyncNativeCallbackChannel() (int64, chan goja.FunctionCall) {
 	return id, ch
 }
 
-func CreateAsyncJSFunction(orgCall func(goja.FunctionCall) goja.Value, vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
+func CreateAsyncJSFunction(orgCall func(goja.FunctionCall) goja.Value, vm *VM) func(goja.FunctionCall) goja.Value {
 	return func(call goja.FunctionCall) goja.Value {
 		go func(call goja.FunctionCall) {
 			callbackID := call.Argument(len(call.Arguments) - 1).ToInteger()
@@ -48,14 +48,14 @@ func CreateAsyncJSFunction(orgCall func(goja.FunctionCall) goja.Value, vm *goja.
 	}
 }
 
-func VMSetAsyncFunction(vm *goja.Runtime, name string, fn func(call goja.FunctionCall) goja.Value) {
+func VMSetAsyncFunction(vm *VM, name string, fn func(call goja.FunctionCall) goja.Value) {
 	vm.Set(name+"_raw", CreateAsyncJSFunction(fn, vm))
 	vm.RunString(fmt.Sprintf(`
     var %s = require('async').createAsyncFunction(%s);
   `, name, name+"_raw"))
 }
 
-func initAsync(vm *goja.Runtime) {
+func initAsync(vm *VM) {
 	vm.Set("_native_async_response", func(call goja.FunctionCall) goja.Value {
 		id := call.Argument(0).ToInteger()
 
