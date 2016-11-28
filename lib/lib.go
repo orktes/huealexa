@@ -11,14 +11,6 @@ type VM struct {
 	sync.Mutex
 }
 
-func (vm *VM) Lock() {
-	vm.Mutex.Lock()
-}
-
-func (vm *VM) Unlock() {
-	vm.Mutex.Unlock()
-}
-
 func (vm *VM) RunString(str string) (goja.Value, error) {
 	vm.Lock()
 	defer vm.Unlock()
