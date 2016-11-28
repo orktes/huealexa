@@ -3,7 +3,6 @@ package hueupnp
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"strings"
@@ -111,7 +110,7 @@ func CreateUPNPResponder(setupLocation string, uuid string, upnpAddr string) {
 			if err != nil {
 				log.Fatal("[UPNP] execute template failed:", err)
 			}
-			fmt.Printf("[UPNP] Sending\n%s\nto %s\n", b.Bytes(), src)
+			log.Printf("[UPNP] Sending\n%s\nto %s\n", b.Bytes(), src)
 			rawCon.WriteTo([]byte(b.String()), addr)
 		}
 	}

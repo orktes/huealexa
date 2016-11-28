@@ -1,6 +1,6 @@
 package main
 
-//go:generate go-bindata -pkg lib -ignore=\.go  -o lib/assets.go lib/...
+//go:generate go-bindata -prefix "lib" -pkg lib -ignore=\.go  -o lib/assets.go lib/...
 
 import (
 	"encoding/json"
@@ -8,7 +8,9 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
+	"strings"
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
@@ -53,7 +55,11 @@ func getIPAddress() string {
 }
 
 func srcLoader(pathname string) ([]byte, error) {
-	asset, err := lib.Asset("lib/" + pathname + ".js")
+	if !strings.HasSuffix(pathname, ".js") {
+		pathname += ".js"
+	}
+
+	asset, err := lib.Asset(pathname)
 	if err == nil {
 		return asset, nil
 	}
@@ -62,6 +68,9 @@ func srcLoader(pathname string) ([]byte, error) {
 }
 
 func main() {
+	//log.SetOutput(ioutil.Discard)
+	log.Printf("Available modules %s", strings.Join(lib.AssetNames(), ", "))
+
 	genuuid, err := uuid.NewV4()
 	if err != nil {
 		panic(err)
