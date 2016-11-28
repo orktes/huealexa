@@ -3,6 +3,7 @@ package lib
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/dop251/goja"
@@ -10,10 +11,13 @@ import (
 
 var nativeAsyncResponseCounter = int64(0)
 var nativeAsyncResponseCallbacks = map[int64]func(call goja.FunctionCall){}
+var nativeAsyncResponseCallbacksLock = &sync.Mutex{}
 
 func CreateAsyncNativeCallback(callback func(call goja.FunctionCall)) int64 {
 	// TODO make thread sage
 	id := atomic.AddInt64(&nativeAsyncResponseCounter, 1)
+	nativeAsyncResponseCallbacksLock.Lock()
+	defer nativeAsyncResponseCallbacksLock.Unlock()
 	nativeAsyncResponseCallbacks[id] = callback
 	return id
 }
@@ -58,7 +62,8 @@ func VMSetAsyncFunction(vm *VM, name string, fn func(call goja.FunctionCall) goj
 func initAsync(vm *VM) {
 	vm.Set("_native_async_response", func(call goja.FunctionCall) goja.Value {
 		id := call.Argument(0).ToInteger()
-
+		nativeAsyncResponseCallbacksLock.Lock()
+		defer nativeAsyncResponseCallbacksLock.Unlock()
 		if cb, ok := nativeAsyncResponseCallbacks[id]; ok {
 			cb(goja.FunctionCall{Arguments: call.Arguments[1:]})
 		}
