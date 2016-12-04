@@ -1,24 +1,19 @@
 package main
 
-//go:generate go-bindata -prefix "lib" -pkg lib -ignore=\.go  -o lib/assets.go lib/...
+//go:generate go-bindata -prefix "vm" -pkg vm -ignore=\.go  -o vm/assets.go vm/...
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"strings"
 
-	"github.com/dop251/goja"
-	"github.com/dop251/goja_nodejs/console"
-	"github.com/dop251/goja_nodejs/require"
 	uuid "github.com/nu7hatch/gouuid"
 	"github.com/orktes/huessimo/hueserver"
 	"github.com/orktes/huessimo/hueupnp"
-	"github.com/orktes/huessimo/lib"
+	"github.com/orktes/huessimo/vm"
 )
 
 func getIPAddress() string {
@@ -54,22 +49,9 @@ func getIPAddress() string {
 	return ""
 }
 
-func srcLoader(pathname string) ([]byte, error) {
-	if !strings.HasSuffix(pathname, ".js") {
-		pathname += ".js"
-	}
-
-	asset, err := lib.Asset(pathname)
-	if err == nil {
-		return asset, nil
-	}
-
-	return nil, errors.New("Package " + pathname + " not found")
-}
-
 func main() {
 	//log.SetOutput(ioutil.Discard)
-	log.Printf("Available modules %s", strings.Join(lib.AssetNames(), ", "))
+	log.Printf("Available modules %s", strings.Join(vm.AssetNames(), ", "))
 
 	genuuid, err := uuid.NewV4()
 	if err != nil {
@@ -95,26 +77,16 @@ func main() {
 		return
 	}
 
-	registry := require.NewRegistryWithLoader(srcLoader)
-	vm := &lib.VM{Runtime: goja.New()}
-	registry.Enable(vm.Runtime)
-	console.Enable(vm.Runtime)
-	lib.Register(vm)
+	runtime, err := vm.NewVM(*scriptSrcPtr)
 
-	script, err := ioutil.ReadFile(*scriptSrcPtr)
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = vm.RunScript(*scriptSrcPtr, string(script))
 	if err != nil {
 		panic(err)
 	}
 
 	getLights := func() hueserver.LightList {
-		callbackID, cbCh := lib.CreateAsyncNativeCallbackChannel()
+		callbackID, cbCh := vm.CreateAsyncNativeCallbackChannel()
 
-		_, err = vm.RunString(fmt.Sprintf(`
+		_, err = runtime.RunString(fmt.Sprintf(`
         require('registry')._getLights(
           require('async').createJSCallback(%d, true)
         );
@@ -135,8 +107,8 @@ func main() {
 		if merr != nil {
 			panic(merr)
 		}
-		callbackID, cbCh := lib.CreateAsyncNativeCallbackChannel()
-		_, err = vm.RunString(fmt.Sprintf(`
+		callbackID, cbCh := vm.CreateAsyncNativeCallbackChannel()
+		_, err = runtime.RunString(fmt.Sprintf(`
       require('registry')._getLight(
         %s,
         require('async').createJSCallback(%d, true)
@@ -164,8 +136,8 @@ func main() {
 			panic(merr)
 		}
 
-		callbackID, cbCh := lib.CreateAsyncNativeCallbackChannel()
-		_, err = vm.RunString(fmt.Sprintf(`
+		callbackID, cbCh := vm.CreateAsyncNativeCallbackChannel()
+		_, err = runtime.RunString(fmt.Sprintf(`
       require('registry')._setLightState(
         %s,
         %s,

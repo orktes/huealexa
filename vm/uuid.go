@@ -1,4 +1,4 @@
-package lib
+package vm
 
 import (
 	"github.com/dop251/goja"
