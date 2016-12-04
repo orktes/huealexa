@@ -74,7 +74,7 @@ func (vm *VM) startWatch(path string) error {
 			select {
 			case ev := <-watcher.Event:
 				if ev.IsModify() {
-					log.Printf("%s changed. Reinitializing VM", path)
+					log.Printf("%s changed. Reinitializing VM if needed.", path)
 					vm.initWithPath(path)
 				}
 			case err := <-watcher.Error:
@@ -90,7 +90,7 @@ func (vm *VM) init(path, value string) (err error) {
 	md5 := md5.Sum([]byte(value))
 
 	if vm.md5 == md5 {
-		log.Print("Script didn't change. Doing nothing.\n")
+		log.Print("Content didn't change. Doing nothing.\n")
 		return
 	}
 
@@ -118,6 +118,10 @@ func (vm *VM) initWithPath(path string) (err error) {
 	}
 
 	return vm.init(path, string(script))
+}
+
+func (vm *VM) Close() {
+	vm.watcher.Close()
 }
 
 func NewVM(path string) (*VM, error) {

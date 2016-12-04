@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	uuid "github.com/nu7hatch/gouuid"
 	"github.com/orktes/huessimo/hueserver"
@@ -160,11 +163,20 @@ func main() {
 	}
 
 	go hueupnp.CreateUPNPResponder("http://"+*ipPtr+":"+*portPtr+"/upnp/setup.xml", *uuidPtr, *upnpPortPtr)
-
 	srv := hueserver.NewServer(*uuidPtr, *ipPtr+":"+*portPtr, *namePtr, getLights, getLight, setLightState)
-	err = srv.Start(":" + *portPtr)
-	if err != nil {
-		panic(err)
-	}
 
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGTERM)
+
+	go func() {
+		err = srv.Start(":" + *portPtr)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	<-c
+
+	log.Print("Stopping...\n")
+	runtime.Close()
 }
