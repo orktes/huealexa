@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"crypto/md5"
 	"errors"
 	"io/ioutil"
 	"log"
@@ -17,6 +18,8 @@ import (
 type VM struct {
 	*goja.Runtime
 	sync.Mutex
+	watcher *fsnotify.Watcher
+	md5     [md5.Size]byte
 }
 
 func (vm *VM) RunString(str string) (goja.Value, error) {
@@ -60,8 +63,10 @@ func (vm *VM) register() {
 func (vm *VM) startWatch(path string) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+
+	vm.watcher = watcher
 
 	// Process events
 	go func() {
@@ -81,7 +86,16 @@ func (vm *VM) startWatch(path string) error {
 	return watcher.Watch(path)
 }
 
-func (vm *VM) initWithPath(path string) (err error) {
+func (vm *VM) init(path, value string) (err error) {
+	md5 := md5.Sum([]byte(value))
+
+	if vm.md5 == md5 {
+		log.Print("Script didn't change. Doing nothing.\n")
+		return
+	}
+
+	vm.md5 = md5
+
 	if vm.Runtime != nil {
 		vm.Runtime.Interrupt(errors.New("Interreupted due to update"))
 	}
@@ -90,15 +104,20 @@ func (vm *VM) initWithPath(path string) (err error) {
 	vm.Runtime = goja.New()
 	vm.register()
 
+	_, err = vm.RunScript(path, value)
+
+	log.Printf("Done initializing %s\n", path)
+
+	return err
+}
+
+func (vm *VM) initWithPath(path string) (err error) {
 	script, err := ioutil.ReadFile(path)
 	if err != nil {
 		return
 	}
 
-	_, err = vm.RunScript(path, string(script))
-
-	log.Printf("Done initializing %s\n", path)
-	return
+	return vm.init(path, string(script))
 }
 
 func NewVM(path string) (*VM, error) {
