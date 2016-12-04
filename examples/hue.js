@@ -17,6 +17,7 @@ var lights = hue.getLights(function (lights) {
   });
 });
 
+/*
 hue.request('/groups', null, null, null, function (err, groups) {
   _.each(groups, function (group, id) {
     registry.addDevice(
@@ -28,21 +29,5 @@ hue.request('/groups', null, null, null, function (err, groups) {
     );
   });
 });
-
-
-// Also add Viera TV
-(function loadViera() {
-  console.log('Trying to discover viera televisions');
-  require('devices/tv/viera').discoverDevices(function (devices) {
-    if (devices.length > 0) {
-      console.log('Adding Viera TV');
-      registry.addDevice(devices[0].createDevice('TV'));
-      registry.addDevice(devices[0].createDevice('Apple TV', 'NRC_CHG_INPUT-ONOFF', 'NRC_TV-ONOFF'));
-    } else {
-      setTimeout(loadViera, 10000);
-    }
-  });
-})();
-
-
+*/
 console.log('Script loaded');
