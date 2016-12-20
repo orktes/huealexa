@@ -1,5 +1,6 @@
 # huessimo
 
+Expose any network connected device to Amazon Echo or Apple HomeKit.
 
 ```bash
 go get -u github.com/orktes/huessimo
@@ -8,3 +9,7 @@ huessimo -uuid="ac103f83-e6e9-41b8-6ae5-1ef6cbe0a021" -ip=10.0.1.4 -src examples
 # Lights provider by script/src are now available in Echo Smart Home
 # getLights needs to match HUE response for /lights, getLight /lights/:id, setLightState PUT /lights/:id/state
 ```
+
+## License
+Hueissimo: See LICENSE file
+hc (HomeKit go library) https://github.com/brutella/hc

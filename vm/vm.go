@@ -19,6 +19,7 @@ type VM struct {
 	*goja.Runtime
 	sync.Mutex
 	watcher *fsnotify.Watcher
+	dataDir string
 	md5     [md5.Size]byte
 }
 
@@ -53,11 +54,12 @@ func (vm *VM) register() {
 	registry := require.NewRegistryWithLoader(vm.srcLoader)
 	registry.Enable(vm.Runtime)
 	console.Enable(vm.Runtime)
-	initAsync(vm)
-	initTimers(vm)
-	initUUID(vm)
-	initProcess(vm)
-	initSSDP(vm)
+	vm.initAsync()
+	vm.initHomeKit()
+	vm.initTimers()
+	vm.initUUID()
+	vm.initProcess()
+	vm.initSSDP()
 }
 
 func (vm *VM) startWatch(path string) error {
@@ -124,8 +126,8 @@ func (vm *VM) Close() {
 	vm.watcher.Close()
 }
 
-func NewVM(path string) (*VM, error) {
-	vm := &VM{}
+func NewVM(path string, dataDir string) (*VM, error) {
+	vm := &VM{dataDir: dataDir}
 	vm.startWatch(path)
 	err := vm.initWithPath(path)
 	return vm, err

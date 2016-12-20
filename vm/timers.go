@@ -7,7 +7,7 @@ import (
 	"github.com/dop251/goja"
 )
 
-func initTimers(vm *VM) {
+func (vm *VM) initTimers() {
 	vm.Set("_native_set_timeout", func(call goja.FunctionCall) goja.Value {
 		id := call.Argument(0).ToInteger()
 		timeout := call.Argument(1).ToInteger()

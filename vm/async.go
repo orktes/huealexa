@@ -30,13 +30,16 @@ func CreateAsyncNativeCallbackChannel() (int64, chan goja.FunctionCall) {
 	return id, ch
 }
 
-func CreateAsyncJSFunction(orgCall func(goja.FunctionCall) goja.Value, vm *VM) func(goja.FunctionCall) goja.Value {
+func (vm *VM) CreateAsyncJSFunction(orgCall func(goja.FunctionCall) goja.Value) func(goja.FunctionCall) goja.Value {
 	return func(call goja.FunctionCall) goja.Value {
 		go func(call goja.FunctionCall) {
 			callbackID := call.Argument(len(call.Arguments) - 1).ToInteger()
 			defer func() {
 				if r := recover(); r != nil {
-					vm.RunString(fmt.Sprintf(`require('async')._native_callback(%d, new Error('%s'), null, true);`, callbackID, r))
+					_, err := vm.RunString(fmt.Sprintf(`require('async')._native_callback(%d, new Error('%s'), null, true);`, callbackID, r))
+					if err != nil {
+						panic(err)
+					}
 				}
 			}()
 			res := orgCall(goja.FunctionCall{Arguments: call.Arguments[:len(call.Arguments)-1]})
@@ -45,21 +48,27 @@ func CreateAsyncJSFunction(orgCall func(goja.FunctionCall) goja.Value, vm *VM) f
 				panic(merr)
 			}
 
-			vm.RunString(fmt.Sprintf(`require('async')._native_callback(%d, null, %s, null, true);`, callbackID, string(data)))
+			_, err := vm.RunString(fmt.Sprintf(`require('async')._native_callback(%d, null, %s, null, true);`, callbackID, string(data)))
+			if err != nil {
+				panic(err)
+			}
 		}(call)
 
 		return goja.Null()
 	}
 }
 
-func VMSetAsyncFunction(vm *VM, name string, fn func(call goja.FunctionCall) goja.Value) {
-	vm.Set(name+"_raw", CreateAsyncJSFunction(fn, vm))
-	vm.RunString(fmt.Sprintf(`
+func (vm *VM) SetAsyncFunction(name string, fn func(call goja.FunctionCall) goja.Value) {
+	vm.Set(name+"_raw", vm.CreateAsyncJSFunction(fn))
+	_, err := vm.RunString(fmt.Sprintf(`
     var %s = require('async').createAsyncFunction(%s);
   `, name, name+"_raw"))
+	if err != nil {
+		panic(err)
+	}
 }
 
-func initAsync(vm *VM) {
+func (vm *VM) initAsync() {
 	vm.Set("_native_async_response", func(call goja.FunctionCall) goja.Value {
 		id := call.Argument(0).ToInteger()
 		nativeAsyncResponseCallbacksLock.Lock()

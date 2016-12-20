@@ -1,16 +1,10 @@
 
+var _ = require('lodash');
 var devices = {};
 var deviceId = 1;
+var handlers = [];
 
-exports._getLights = function getLights(callback) {
-  return callback(devices);
-}
-
-exports._getLight = function getLight(id, callback) {
-  return callback(devices[id]);
-}
-
-exports._setLightState = function setLightState(id, state, callback) {
+function setLightState(id, state, callback) {
   devices[id].setState(state, function (response) {
     if (response) {
       return callback(response);
@@ -21,7 +15,23 @@ exports._setLightState = function setLightState(id, state, callback) {
     }
     return callback([{success: success}]);
   });
+}
 
+exports._getLights = function getLights(callback) {
+  return callback(devices);
+}
+
+exports._getLight = function getLight(id, callback) {
+  return callback(devices[id]);
+}
+
+exports._setLightState = function (id, state, callback) {
+  setLightState(id, state, function (response) {
+    callback(response);
+    _.each(handlers, function (handler) {
+      handler.setLightState(id, response, state);
+    });
+  });
 }
 
 exports.createDevice = function (name, type, setStateCallback) {
@@ -57,6 +67,9 @@ exports.addDevice = function (device) {
   console.log("[REGISTRY]: Adding device " + device.toJSON().name);
   var id = deviceId++;
   devices[id] = device;
+  _.each(handlers, function (handler) {
+    handler.addDevice(id, device);
+  });
   return id;
 };
 
@@ -68,4 +81,15 @@ exports.removeDevice = function (device) {
       return;
     }
   }
+};
+
+exports.addHandler = function (handler) {
+  console.log("[REGISTRY]: New handler added " + handler.toString());
+  handler.addLightStateListener(function (id, state, callback) {
+    setLightState(id, state, callback);
+  });
+  handlers.push(handler);
+  _.each(devices, function (device, id) {
+    handler.addDevice(id, device);
+  });
 };

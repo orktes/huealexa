@@ -7,7 +7,7 @@ import (
 	"github.com/dop251/goja"
 )
 
-func initProcess(vm *VM) {
+func (vm *VM) initProcess() {
 	fn := func(call goja.FunctionCall) goja.Value {
 		cmd := call.Argument(0).String()
 
@@ -21,5 +21,5 @@ func initProcess(vm *VM) {
 		return vm.ToValue(string(out))
 	}
 	vm.Set("_native_exec", fn)
-	VMSetAsyncFunction(vm, "_native_exec_async", fn)
+	vm.SetAsyncFunction("_native_exec_async", fn)
 }
