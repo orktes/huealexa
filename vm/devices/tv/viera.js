@@ -53,8 +53,8 @@ VieraTV.prototype = {
 };
 
 module.exports.discoverDevices = function (callback) {
-  ssdp.discoverDevices('urn:panasonic-com:service:p00NetworkControl:1', function (devices) {
-    callback(_.map(devices, function (device) {
+  ssdp.discoverDevices('urn:panasonic-com:service:p00NetworkControl:1', function (err, devices) {
+    callback(err, _.map(devices, function (device) {
       return new VieraTV(device);
     }));
   });
