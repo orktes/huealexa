@@ -3,6 +3,20 @@ var _ = require('lodash');
 
 var eventEmitter = new EventEmitter();
 
+function deUmlaut(value){
+  value = value.toLowerCase();
+  value = value.replace(/ä/g, 'ae');
+  value = value.replace(/ö/g, 'oe');
+  value = value.replace(/ü/g, 'ue');
+  value = value.replace(/ß/g, 'ss');
+  value = value.replace(/ /g, '-');
+  value = value.replace(/\./g, '');
+  value = value.replace(/,/g, '');
+  value = value.replace(/\(/g, '');
+  value = value.replace(/\)/g, '');
+  return value;
+}
+
 var HomeKit = function (pin) {
   this.pin = pin;
   this.states = {};
@@ -70,7 +84,7 @@ HomeKit.prototype = {
     // Only support lights for now
     var deviceData = device.toJSON();
     var info = {
-      Name: deviceData.name,
+      Name: deUmlaut(deviceData.name),
       SerialNumber: deviceData.uniqueid,
       Manufacturer: deviceData.manufacturername,
       Model: deviceData.modelid,
