@@ -10,10 +10,10 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"os/user"
 	"strings"
 	"syscall"
 
+	homedir "github.com/mitchellh/go-homedir"
 	uuid "github.com/nu7hatch/gouuid"
 	"github.com/orktes/huessimo/hueserver"
 	"github.com/orktes/huessimo/hueupnp"
@@ -62,18 +62,13 @@ func main() {
 		panic(err)
 	}
 
-	usr, err := user.Current()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	scriptSrcPtr := flag.String("src", "", "Script source file location")
 	uuidPtr := flag.String("uuid", "", "UUID for the HUE server (for example \""+genuuid.String()+"\")")
 	portPtr := flag.String("port", "8989", "Port for the HUE server")
 	upnpPortPtr := flag.String("upnp", "239.255.255.250:1900", "UPNP multicast addr for the HUE server")
 	namePtr := flag.String("name", "fakeServer", "Name for the HUE server")
 	ipPtr := flag.String("ip", getIPAddress(), "Interface to be used")
-	dataDirPtr := flag.String("data", usr.HomeDir+"/.hueissimo", "Directory to store persisten data")
+	dataDirPtr := flag.String("data", "~/.hueissimo", "Directory to store persisten data")
 
 	flag.Parse()
 
@@ -87,7 +82,12 @@ func main() {
 		return
 	}
 
-	runtime, err := vm.NewVM(*scriptSrcPtr, *dataDirPtr)
+	dataDir, err := homedir.Expand(*dataDirPtr)
+	if err != nil {
+		panic(err)
+	}
+
+	runtime, err := vm.NewVM(*scriptSrcPtr, dataDir)
 
 	if err != nil {
 		panic(err)
