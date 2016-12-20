@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/orktes/huessimo.svg?branch=master)](https://travis-ci.org/orktes/huessimo)
+
 # huessimo
 
 Expose any network connected device to Amazon Echo or Apple HomeKit.
