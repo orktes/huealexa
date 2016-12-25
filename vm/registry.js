@@ -18,8 +18,7 @@ function setLightState(id, state, callback) {
 }
 
 exports._getLights = function getLights(callback) {
-  return callback(devices)
-  );
+  return callback(devices);
 }
 
 exports._getLight = function getLight(id, callback) {
