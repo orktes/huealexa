@@ -5,9 +5,10 @@ import (
 	"sync/atomic"
 )
 
+var nextListenerId int64
+
 type listener struct {
 	sync.RWMutex
-	nextID    int64
 	listeners map[int64]func(interface{})
 }
 
@@ -19,7 +20,7 @@ func (l *listener) addListener(fn func(interface{})) int64 {
 		l.listeners = map[int64]func(interface{}){}
 	}
 
-	id := atomic.AddInt64(&l.nextID, 1)
+	id := atomic.AddInt64(&nextListenerId, 1)
 	l.listeners[id] = fn
 	return id
 }
