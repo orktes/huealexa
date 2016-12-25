@@ -60,6 +60,7 @@ func (vm *VM) register() {
 	vm.initUUID()
 	vm.initProcess()
 	vm.initSSDP()
+	vm.initZWay()
 }
 
 func (vm *VM) startWatch(path string) error {

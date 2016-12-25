@@ -52,18 +52,18 @@ HomeKit.prototype = {
       };
     }
 
-    eventEmitter.on('light_on_change', transform('on'));
-    eventEmitter.on('light_bri_change', transform('bri', function (value) {
+    eventEmitter.on('on_change', transform('on'));
+    eventEmitter.on('bri_change', transform('bri', function (value) {
       return Math.round(255 * (value / 100));
     }));
-    eventEmitter.on('light_sat_change', transform('sat', function (value) {
+    eventEmitter.on('sat_change', transform('sat', function (value) {
       return Math.round(255 * (value / 100));
     }));
-    eventEmitter.on('light_hue_change', transform('hue', function (value) {
+    eventEmitter.on('hue_change', transform('hue', function (value) {
       return Math.floor(value * 182.0444);
     }));
   },
-  setLightState: function (id, response, state) {
+  setDeviceState: function (id, state) {
     if ('on' in state) {
       _set_homekit_device_on(id, state.on);
     }
@@ -79,10 +79,17 @@ HomeKit.prototype = {
     if ('hue' in state) {
       _set_homekit_device_hue(id, Math.round(state.hue / 182.0444));
     }
+
+    if ('temp' in state) {
+      _set_homekit_device_temperature(id, state.temp);
+    }
+
+    if ('lux' in state) {
+      _set_homekit_device_lux(id, state.lux);
+    }
   },
   addDevice: function (id, device) {
-    // Only support lights for now
-    var deviceData = device.toJSON();
+    var deviceData = device.toJSON ? device.toJSON() : device;
     var info = {
       Name: deUmlaut(deviceData.name),
       SerialNumber: deviceData.uniqueid,
@@ -90,8 +97,8 @@ HomeKit.prototype = {
       Model: deviceData.modelid,
     };
 
-    _add_homekit_device(id, "lightbulb", this.pin, JSON.stringify(info));
-    this.setLightState(id, {}, deviceData.state);
+    _add_homekit_device(id, deviceData.homekit_type || "lightbulb", this.pin, JSON.stringify(info));
+    this.setDeviceState(id, deviceData.state);
   },
   toString: function () {
     return "HomeKit";
@@ -100,9 +107,9 @@ HomeKit.prototype = {
 
 
 module.exports = {
-  _remote_on_change: eventEmitter.emit.bind(eventEmitter, 'light_on_change'),
-  _remote_bri_change: eventEmitter.emit.bind(eventEmitter, 'light_bri_change'),
-  _remote_sat_change: eventEmitter.emit.bind(eventEmitter, 'light_sat_change'),
-  _remote_hue_change: eventEmitter.emit.bind(eventEmitter, 'light_hue_change'),
+  _remote_on_change: eventEmitter.emit.bind(eventEmitter, 'on_change'),
+  _remote_bri_change: eventEmitter.emit.bind(eventEmitter, 'bri_change'),
+  _remote_sat_change: eventEmitter.emit.bind(eventEmitter, 'sat_change'),
+  _remote_hue_change: eventEmitter.emit.bind(eventEmitter, 'hue_change'),
   HomeKit: HomeKit
 }

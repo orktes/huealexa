@@ -19,10 +19,10 @@ func (vm *VM) initHomeKit() {
 	}
 	homeKitTransports = []hc.Transport{}
 
-	devices := map[int64]interface{}{}
+	devices := map[string]interface{}{}
 
 	vm.Set("_add_homekit_device", func(call goja.FunctionCall) goja.Value {
-		id := call.Argument(0).ToInteger()
+		id := call.Argument(0).String()
 		deviceType := call.Argument(1).String()
 		pin := call.Argument(2).String()
 		deviceInfoStr := call.Argument(3).String()
@@ -44,32 +44,83 @@ func (vm *VM) initHomeKit() {
 				if !on {
 					state = "false"
 				}
-				_, err := vm.RunString(fmt.Sprintf(`require('homekit')._remote_on_change(%d, %s);`, id, state))
+				_, err := vm.RunString(fmt.Sprintf(`require('homekit')._remote_on_change("%s", %s);`, id, state))
 				if err != nil {
 					log.Println(err)
 				}
 			})
 
 			acc.Lightbulb.Brightness.OnValueRemoteUpdate(func(bri int) {
-				_, err := vm.RunString(fmt.Sprintf(`require('homekit')._remote_bri_change(%d, %d);`, id, bri))
+				_, err := vm.RunString(fmt.Sprintf(`require('homekit')._remote_bri_change("%s", %d);`, id, bri))
 				if err != nil {
 					log.Println(err)
 				}
 			})
 
 			acc.Lightbulb.Hue.OnValueRemoteUpdate(func(hue float64) {
-				_, err := vm.RunString(fmt.Sprintf(`require('homekit')._remote_hue_change(%d, %f);`, id, hue))
+				_, err := vm.RunString(fmt.Sprintf(`require('homekit')._remote_hue_change("%s", %f);`, id, hue))
 				if err != nil {
 					log.Println(err)
 				}
 			})
 
 			acc.Lightbulb.Saturation.OnValueRemoteUpdate(func(sat float64) {
-				_, err := vm.RunString(fmt.Sprintf(`require('homekit')._remote_sat_change(%d, %f);`, id, sat))
+				_, err := vm.RunString(fmt.Sprintf(`require('homekit')._remote_sat_change("%s", %f);`, id, sat))
 				if err != nil {
 					log.Println(err)
 				}
 			})
+
+			hc.OnTermination(func() {
+				t.Stop()
+			})
+
+			homeKitTransports = append(homeKitTransports, t)
+			devices[id] = acc
+
+			go t.Start()
+		case "temperature_sensor":
+			// Hmmm just throwin in random values (sound reasonable to a Finnish guy)
+			acc := accessory.NewTemperatureSensor(*info, 0, -40, 130, 0.1)
+			config := hc.Config{Pin: pin, StoragePath: vm.dataDir + "/homekit/" + info.Name}
+			t, err := hc.NewIPTransport(config, acc.Accessory)
+			if err != nil {
+				log.Panic(err)
+			}
+
+			hc.OnTermination(func() {
+				t.Stop()
+			})
+
+			homeKitTransports = append(homeKitTransports, t)
+			devices[id] = acc
+
+			go t.Start()
+		case "door":
+			// Hmmm just throwin in random values (sound reasonable to a Finnish guy)
+			acc := NewHomeKitDoor(*info)
+			config := hc.Config{Pin: pin, StoragePath: vm.dataDir + "/homekit/" + info.Name}
+			t, err := hc.NewIPTransport(config, acc.Accessory)
+			if err != nil {
+				log.Panic(err)
+			}
+
+			hc.OnTermination(func() {
+				t.Stop()
+			})
+
+			homeKitTransports = append(homeKitTransports, t)
+			devices[id] = acc
+
+			go t.Start()
+
+		case "light_sensor":
+			acc := NewHomeKitLightSensor(*info)
+			config := hc.Config{Pin: pin, StoragePath: vm.dataDir + "/homekit/" + info.Name}
+			t, err := hc.NewIPTransport(config, acc.Accessory)
+			if err != nil {
+				log.Panic(err)
+			}
 
 			hc.OnTermination(func() {
 				t.Stop()
@@ -85,19 +136,26 @@ func (vm *VM) initHomeKit() {
 	})
 
 	vm.Set("_set_homekit_device_on", func(call goja.FunctionCall) goja.Value {
-		id := call.Argument(0).ToInteger()
+		id := call.Argument(0).String()
 		value := call.Argument(1).ToBoolean()
 		device := devices[id]
 
 		switch device.(type) {
 		case *accessory.Lightbulb:
 			device.(*accessory.Lightbulb).Lightbulb.On.SetValue(value)
+		case *HomeKitDoor:
+			intValue := 0
+			if value {
+				intValue = 1
+			}
+
+			device.(*HomeKitDoor).Door.CurrentPosition.SetValue(intValue)
 		}
 		return goja.Null()
 	})
 
 	vm.Set("_set_homekit_device_bri", func(call goja.FunctionCall) goja.Value {
-		id := call.Argument(0).ToInteger()
+		id := call.Argument(0).String()
 		value := call.Argument(1).ToInteger()
 		device := devices[id]
 
@@ -109,7 +167,7 @@ func (vm *VM) initHomeKit() {
 	})
 
 	vm.Set("_set_homekit_device_hue", func(call goja.FunctionCall) goja.Value {
-		id := call.Argument(0).ToInteger()
+		id := call.Argument(0).String()
 		value := call.Argument(1).ToFloat()
 		device := devices[id]
 
@@ -120,8 +178,32 @@ func (vm *VM) initHomeKit() {
 		return goja.Null()
 	})
 
+	vm.Set("_set_homekit_device_temperature", func(call goja.FunctionCall) goja.Value {
+		id := call.Argument(0).String()
+		value := call.Argument(1).ToFloat()
+		device := devices[id]
+
+		switch device.(type) {
+		case *accessory.Thermometer:
+			device.(*accessory.Thermometer).TempSensor.CurrentTemperature.SetValue(value)
+		}
+		return goja.Null()
+	})
+
+	vm.Set("_set_homekit_device_lux", func(call goja.FunctionCall) goja.Value {
+		id := call.Argument(0).String()
+		value := call.Argument(1).ToFloat()
+		device := devices[id]
+
+		switch device.(type) {
+		case *HomeKitLightSensor:
+			device.(*HomeKitLightSensor).LightSensor.CurrentAmbientLightLevel.SetValue(value)
+		}
+		return goja.Null()
+	})
+
 	vm.Set("_set_homekit_device_sat", func(call goja.FunctionCall) goja.Value {
-		id := call.Argument(0).ToInteger()
+		id := call.Argument(0).String()
 		value := call.Argument(1).ToFloat()
 		device := devices[id]
 

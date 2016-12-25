@@ -18,18 +18,25 @@ function setLightState(id, state, callback) {
 }
 
 exports._getLights = function getLights(callback) {
-  return callback(devices);
+  return callback(
+    _.filter(_.map(devices, function (device) {
+      return device.toHue() ? device.toHue() : device
+    }), function (device) {
+      return !device.non_listed;
+    })
+  );
 }
 
 exports._getLight = function getLight(id, callback) {
-  return callback(devices[id]);
+  var device = devices[id];
+  return callback(device.toHue() ? device.toHue() : device);
 }
 
 exports._setLightState = function (id, state, callback) {
   setLightState(id, state, function (response) {
     callback(response);
     _.each(handlers, function (handler) {
-      handler.setLightState(id, response, state);
+      handler.setDeviceState(id, state);
     });
   });
 }
