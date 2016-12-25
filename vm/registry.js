@@ -20,7 +20,7 @@ function setLightState(id, state, callback) {
 exports._getLights = function getLights(callback) {
   return callback(
     _.filter(_.map(devices, function (device) {
-      return device.toHue() ? device.toHue() : device
+      return device.toHue ? device.toHue() : device
     }), function (device) {
       return !device.non_listed;
     })
