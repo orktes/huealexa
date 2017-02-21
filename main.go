@@ -15,9 +15,9 @@ import (
 
 	homedir "github.com/mitchellh/go-homedir"
 	uuid "github.com/nu7hatch/gouuid"
-	"github.com/orktes/huessimo/hueserver"
-	"github.com/orktes/huessimo/hueupnp"
-	"github.com/orktes/huessimo/vm"
+	"github.com/orktes/huealexa/hueserver"
+	"github.com/orktes/huealexa/hueupnp"
+	"github.com/orktes/huealexa/vm"
 )
 
 func getIPAddress() string {

@@ -5,13 +5,13 @@ script:
   - go get -u github.com/jteeuwen/go-bindata/...
   - go generate
   - env GOOS=linux GOARCH=arm go build -v
-  - mv huessimo huessimo_raspberrypi
+  - mv huealexa huealexa_raspberrypi
 deploy:
   skip_cleanup: true
   provider: releases
   api_key:
     secure: M3bDWjNCU+O/6kAmX81u/ysbDmpZkP1veNnlGYf1PqSQaoXtRgS4yKddpJZRFbZCRgRQACcBMwC3Oc1ZcOgDiRQiYMdS8z5ffEubIFlv+gPrcDjD9XQBFd/W/OEnXT0nJ28l1RcogoGtDNCM/DUbQhAdDpogwBBkJNdhDRlqUFMIHMVh5TR8AEgp4Ckvwkzgympi02fwcIzmgs4+7PjROgMCxvrsAqVmeTvG+zvJgWK01dPBPyOmBLPXmkXX6UQrbL8fn3mlBgtMuUfRxHNcDfLCsUbvTElFtAch2zmnpTJHKS0aG4bamdFazwi4xlDPO7iP6dV1wbnmuFM7yfmqvx1uHdtpb5oQSJdBI5p3Rr7QWnALxKPh7WZ40/7pcpKy3Rnoi6Og/U1orEnLenHKM1PlYkxRuv4r+arzmD7f8J+fbJawKJ+34cYwMwcgttZH8vPxu9ztzIbiG8KE/MP9WZuBZ49J+YTqQeObk7pnazAhpejGvEmMAFcvk4UlKdOJjsdMZXrQr6BYSnoB80hgvwYv7gjAWwkIFjlRG+XFbjIEyQqfAzVA5EJ/b580DRi8WXoRUCRhSCuZjGfyvgjuUu6INMreEOEfKyBvNfZBCU4PgKAwq6GhgHXwoRu7VcHs4vZe4c1n1IiLgRLlBh79H3NTVGar1AnUmqKuAGpRJIE=
   file:
-    - huessimo_raspberrypi
+    - huealexa_raspberrypi
   on:
-    repo: orktes/huessimo
+    repo: orktes/huealexa

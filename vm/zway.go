@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/dop251/goja"
-	"github.com/orktes/huessimo/zway"
+	"github.com/orktes/huealexa/zway"
 )
 
 var zWayMap = map[string]*zway.ZWay{}

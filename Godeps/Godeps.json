@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/orktes/huessimo",
+	"ImportPath": "github.com/orktes/huealexa",
 	"GoVersion": "go1.6",
 	"GodepVersion": "v74",
 	"Deps": [
