@@ -16,10 +16,21 @@ import (
 	"github.com/labstack/echo"
 )
 
+var echoHandler *echo.Echo
+var onceAddHanlder sync.Once
+
 func (vm *VM) initServer() {
 	callbackCounter := int64(0)
 	bodyMap := map[int64]io.ReadCloser{}
 	bodyMapMutex := sync.Mutex{}
+
+	onceAddHanlder.Do(func() {
+		vm.server.Use(echo.MiddlewareFunc(func(echo.HandlerFunc) echo.HandlerFunc {
+			return echo.WrapHandler(echoHandler)
+		}))
+	})
+
+	echoHandler = echo.New()
 
 	vm.Set("_add_server_handler", func(call goja.FunctionCall) goja.Value {
 		id := atomic.AddInt64(&callbackCounter, 1)
@@ -90,14 +101,15 @@ func (vm *VM) initServer() {
 
 		switch method {
 		case http.MethodGet:
-			vm.server.GET(url, handler)
+			echoHandler.GET(url, handler)
 		case http.MethodPost:
-			vm.server.POST(url, handler)
+			echoHandler.POST(url, handler)
 		case http.MethodPut:
-			vm.server.PUT(url, handler)
+			echoHandler.PUT(url, handler)
 		case http.MethodDelete:
-			vm.server.DELETE(url, handler)
+			echoHandler.DELETE(url, handler)
 		case http.MethodHead:
+			echoHandler.HEAD(url, handler)
 		}
 
 		return vm.ToValue(id)
