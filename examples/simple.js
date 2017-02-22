@@ -1,5 +1,6 @@
 var registry = require('registry');
 var exec = require('process').exec;
+var server = require('server');
 
 registry.addDevice(registry.createDevice('Testing', registry.DimmableLamp, function (state, cb) {
   console.log('State changed - ' + JSON.stringify(state));
@@ -10,3 +11,7 @@ registry.addDevice(registry.createDevice('Second', registry.DimmableLamp, functi
   console.log('State changed - ' + JSON.stringify(state));
   return cb();
 }));
+
+
+server.get('/foobar', function (req, res) {
+});

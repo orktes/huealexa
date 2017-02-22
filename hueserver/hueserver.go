@@ -78,17 +78,13 @@ type Light struct {
 type LightList map[string]Light
 
 type Server struct {
-	mux           *echo.Echo
+	*echo.Echo
 	UUID          string
 	FriendlyName  string
 	URLBase       string
 	GetLights     func() LightList
 	GetLight      func(id string) Light
 	SetLightState func(id string, state LightStateChange) LightStateChangeResponse
-}
-
-func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	server.mux.ServeHTTP(w, r)
 }
 
 func (server *Server) Start(port string) error {
@@ -122,7 +118,7 @@ func (server *Server) setLightState(c echo.Context) error {
 
 func NewServer(uuid, urlBase, friendlyName string, getLights func() LightList, getLight func(id string) Light, setLightState func(id string, state LightStateChange) LightStateChangeResponse) (srv *Server) {
 	srv = &Server{
-		mux:           echo.New(),
+		Echo:          echo.New(),
 		UUID:          uuid,
 		FriendlyName:  friendlyName,
 		URLBase:       urlBase,
@@ -131,12 +127,12 @@ func NewServer(uuid, urlBase, friendlyName string, getLights func() LightList, g
 		SetLightState: setLightState,
 	}
 
-	srv.mux.Use(middleware.Logger())
-	srv.mux.GET("/upnp/setup.xml", srv.serveSetupXML)
-	srv.mux.GET("/api/:userId", srv.getLights)
-	srv.mux.GET("/api/:userId/lights", srv.getLights)
-	srv.mux.PUT("/api/:userId/lights/:lightId/state", srv.setLightState)
-	srv.mux.GET("/api/:userId/lights/:lightId", srv.getLight)
+	srv.Use(middleware.Logger())
+	srv.GET("/upnp/setup.xml", srv.serveSetupXML)
+	srv.GET("/api/:userId", srv.getLights)
+	srv.GET("/api/:userId/lights", srv.getLights)
+	srv.PUT("/api/:userId/lights/:lightId/state", srv.setLightState)
+	srv.GET("/api/:userId/lights/:lightId", srv.getLight)
 
 	return
 }

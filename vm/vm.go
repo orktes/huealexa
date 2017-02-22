@@ -13,11 +13,13 @@ import (
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
+	"github.com/orktes/huealexa/hueserver"
 )
 
 type VM struct {
 	*goja.Runtime
 	sync.Mutex
+	server  *hueserver.Server
 	watcher *fsnotify.Watcher
 	dataDir string
 	md5     [md5.Size]byte
@@ -54,6 +56,9 @@ func (vm *VM) register() {
 	registry := require.NewRegistryWithLoader(vm.srcLoader)
 	registry.Enable(vm.Runtime)
 	console.Enable(vm.Runtime)
+	vm.initServer()
+	vm.initFS()
+	vm.initPath()
 	vm.initAsync()
 	vm.initHomeKit()
 	vm.initTimers()
@@ -105,6 +110,12 @@ func (vm *VM) init(path, value string) (err error) {
 
 	log.Printf("Initializing VM with %s\n", path)
 	vm.Runtime = goja.New()
+	// Set env
+	vm.Set("env", map[string]interface{}{
+		"data_dir":      vm.dataDir,
+		"huealexa_uuid": vm.server.UUID,
+	})
+
 	vm.register()
 
 	_, err = vm.RunScript(path, value)
@@ -127,8 +138,8 @@ func (vm *VM) Close() {
 	vm.watcher.Close()
 }
 
-func NewVM(path string, dataDir string) (*VM, error) {
-	vm := &VM{dataDir: dataDir}
+func NewVM(path string, dataDir string, server *hueserver.Server) (*VM, error) {
+	vm := &VM{dataDir: dataDir, server: server}
 	vm.startWatch(path)
 	err := vm.initWithPath(path)
 	return vm, err

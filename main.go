@@ -87,11 +87,7 @@ func main() {
 		panic(err)
 	}
 
-	runtime, err := vm.NewVM(*scriptSrcPtr, dataDir)
-
-	if err != nil {
-		panic(err)
-	}
+	var runtime *vm.VM
 
 	getLights := func() hueserver.LightList {
 		callbackID, cbCh := vm.CreateAsyncNativeCallbackChannel()
@@ -171,6 +167,11 @@ func main() {
 
 	go hueupnp.CreateUPNPResponder("http://"+*ipPtr+":"+*portPtr+"/upnp/setup.xml", *uuidPtr, *upnpPortPtr)
 	srv := hueserver.NewServer(*uuidPtr, *ipPtr+":"+*portPtr, *namePtr, getLights, getLight, setLightState)
+	runtime, err = vm.NewVM(*scriptSrcPtr, dataDir, srv)
+
+	if err != nil {
+		panic(err)
+	}
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGTERM)
