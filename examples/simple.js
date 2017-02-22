@@ -12,7 +12,6 @@ registry.addDevice(registry.createDevice('Second', registry.DimmableLamp, functi
   return cb();
 }));
 
-
 server.get('/foobar', function (req, res) {
   res.headers["content-type"] = "text/plain";
   res.end("You can create custom http routes also");
