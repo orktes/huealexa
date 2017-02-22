@@ -8,6 +8,7 @@ import (
 	"strings"
 	"text/template"
 
+	reuse "github.com/jbenet/go-reuseport"
 	"golang.org/x/net/ipv4"
 )
 
@@ -41,11 +42,13 @@ func createSocket() (*ipv4.PacketConn, net.PacketConn, error) {
 		log.Fatalf("net.Interfaces error: %s", err)
 		return nil, nil, err
 	}
-	con, err := net.ListenPacket("udp4", "0.0.0.0:1900")
+
+	con, err := reuse.ListenPacket("udp4", "0.0.0.0:1900")
 	if err != nil {
 		log.Fatalf("net.ListenPacket error: %s", err)
 		return nil, nil, err
 	}
+
 	p := ipv4.NewPacketConn(con)
 	p.SetMulticastLoopback(true)
 	didFindInterface := false
