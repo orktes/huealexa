@@ -25,9 +25,9 @@ func (vm *VM) initServer() {
 	bodyMapMutex := sync.Mutex{}
 
 	onceAddHanlder.Do(func() {
-		vm.server.Use(echo.MiddlewareFunc(func(echo.HandlerFunc) echo.HandlerFunc {
-			return echo.WrapHandler(echoHandler)
-		}))
+		vm.server.Any("/*", echo.WrapHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			echoHandler.ServeHTTP(w, r)
+		})))
 	})
 
 	echoHandler = echo.New()
