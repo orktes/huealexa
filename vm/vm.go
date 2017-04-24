@@ -57,6 +57,7 @@ func (vm *VM) register() {
 	registry.Enable(vm.Runtime)
 	console.Enable(vm.Runtime)
 	vm.initServer()
+	vm.initAlexa()
 	vm.initFS()
 	vm.initPath()
 	vm.initAsync()

@@ -3,15 +3,19 @@ var fs = require('fs');
 var http = require('http');
 var _ = require('lodash');
 var server = require('server');
+var EventEmitter = require('eventemitter');
 
 var fullCredentialPath = path.join(env.data_dir, '.avs_credentials');
 
-module.exports = {
+module.exports = _.extend(new EventEmitter(), {
+  _downchannel: function (data) {
+    console.log(data);
+  },
   _renew: function () {
     var updated = new Date(this._credentials.updated);
     var timeLeft = updated.getTime() + (this._credentials.expires_in * 1000) - Date.now();
     if (timeLeft < 1000 * 60 * 5) {
-      var response = http.request(this._credentials.auth_url, "POST", {
+      var response = http.request("https://huealexaauth.herokuapp.com", "POST", {
         refresh_token: this._credentials.refresh_token
       });
 
@@ -35,10 +39,12 @@ module.exports = {
       this._persistCredentials()
     }
     this._renew();
+    _alexa_downchannel(this._credentials.access_token);
     console.log("[ALEXA]: Initialized");
   }
-};
+});
 
+// Setup http server
 server.get('/alexa/auth', function (req, res) {
   var url = 'https://huealexaauth.herokuapp.com/?uuid=' + env.huealexa_uuid +  '&redirect=' + encodeURIComponent('http://' + req.base  + req.path);
   res.setHeader("Location", url);
