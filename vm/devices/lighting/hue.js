@@ -36,6 +36,13 @@ HueBridge.prototype = {
   request: function (path, method, data, headers, callback) {
     return requestAsync(this.api + path, method, data, headers, callback);
   },
+  getLight: function (id, callback) {
+    var self = this;
+    this.request('/lights/' + id, null, null, null, function (err, light) {
+      light.id = id;
+      callback(new HueLight(light, self));
+    });
+  },
   getLights: function (callback) {
     var self = this;
     this.request('/lights', null, null, null, function (err, response) {

@@ -8,7 +8,7 @@ var ZWayDevice = function (data) {
   _.extend(this, data);
 };
 
-ZWayDevice.prototype = _.extend(EventEmitter.prototype, {
+ZWayDevice.prototype = _.extend({}, EventEmitter.prototype, {
   _setLevel: function (value) {
     this.metrics.level = value;
     this.emit('level_change', value);

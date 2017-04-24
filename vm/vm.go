@@ -67,6 +67,7 @@ func (vm *VM) register() {
 	vm.initProcess()
 	vm.initSSDP()
 	vm.initZWay()
+	vm.initWebSocket()
 }
 
 func (vm *VM) startWatch(path string) error {
