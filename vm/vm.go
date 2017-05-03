@@ -69,6 +69,7 @@ func (vm *VM) register() {
 	console.Enable(vm.Runtime)
 	vm.initServer()
 	vm.initAlexa()
+	vm.initBase64()
 	vm.initFS()
 	vm.initPath()
 	vm.initAsync()
