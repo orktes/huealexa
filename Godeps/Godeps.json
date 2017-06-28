@@ -1,7 +1,7 @@
 {
 	"ImportPath": "github.com/orktes/huealexa",
-	"GoVersion": "go1.6",
-	"GodepVersion": "v74",
+	"GoVersion": "go1.8",
+	"GodepVersion": "v79",
 	"Deps": [
 		{
 			"ImportPath": "github.com/aead/chacha20",
@@ -161,8 +161,25 @@
 			"Rev": "062d836dd7e5e3ec2cf65390c2ab3849afb72ab8"
 		},
 		{
+			"ImportPath": "github.com/fika-io/go-avs/multipart2",
+			"Rev": "90313677d78517e0f1ac44d47f85c23a1502bae0"
+		},
+		{
+			"ImportPath": "github.com/gorilla/websocket",
+			"Comment": "v1.2.0",
+			"Rev": "ea4d1f681babbce9545c9c5f3d5194a789c89f5b"
+		},
+		{
 			"ImportPath": "github.com/gosexy/to",
 			"Rev": "c20e083e31230b84ffa23c5d2fb0bc55f5292681"
+		},
+		{
+			"ImportPath": "github.com/gxed/GoEndian",
+			"Rev": "0f5c6873267e5abf306ffcdfcfa4bf77517ef4a7"
+		},
+		{
+			"ImportPath": "github.com/gxed/eventfd",
+			"Rev": "80a92cca79a8041496ccc9dd773fcb52a57ec6f9"
 		},
 		{
 			"ImportPath": "github.com/huin/goupnp",
@@ -183,6 +200,26 @@
 		{
 			"ImportPath": "github.com/huin/goupnp/ssdp",
 			"Rev": "949b8a77532ae1076171f4d112a5eb41354cb340"
+		},
+		{
+			"ImportPath": "github.com/ipfs/go-log",
+			"Rev": "7c24d3c8b0889a7091d7f3618b9ad32b575db2c6"
+		},
+		{
+			"ImportPath": "github.com/jbenet/go-reuseport",
+			"Rev": "dda7388ef3b7f2c95e80fbc8d0206cc5acb8b90b"
+		},
+		{
+			"ImportPath": "github.com/jbenet/go-reuseport/poll",
+			"Rev": "dda7388ef3b7f2c95e80fbc8d0206cc5acb8b90b"
+		},
+		{
+			"ImportPath": "github.com/jbenet/go-reuseport/singlepoll",
+			"Rev": "dda7388ef3b7f2c95e80fbc8d0206cc5acb8b90b"
+		},
+		{
+			"ImportPath": "github.com/jbenet/go-sockaddr/net",
+			"Rev": "2e7ea655c10e4d4d73365f0f073b81b39cb08ee1"
 		},
 		{
 			"ImportPath": "github.com/labstack/echo",
@@ -216,7 +253,7 @@
 		},
 		{
 			"ImportPath": "github.com/mattn/go-colorable",
-			"Comment": "v0.0.6-9-gd228849",
+			"Comment": "v0.0.7",
 			"Rev": "d228849504861217f796da67fae4f6e347643f15"
 		},
 		{
@@ -240,6 +277,10 @@
 			"Rev": "5dcf00d8b228be86307f952f550f2191d956b9e2"
 		},
 		{
+			"ImportPath": "github.com/rogertalk/go-avs",
+			"Rev": "90313677d78517e0f1ac44d47f85c23a1502bae0"
+		},
+		{
 			"ImportPath": "github.com/tadglines/go-pkgs/crypto/srp",
 			"Rev": "1f86682992f1a784aa7592b2be0ae80f194b2479"
 		},
@@ -251,6 +292,10 @@
 		{
 			"ImportPath": "github.com/valyala/fasttemplate",
 			"Rev": "3b874956e03f1636d171bda64b130f9135f42cff"
+		},
+		{
+			"ImportPath": "github.com/whyrusleeping/go-logging",
+			"Rev": "0a5b4a6decf577ce8293eca85ec733d7ab92d742"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/acme",
