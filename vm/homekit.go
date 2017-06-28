@@ -80,8 +80,24 @@ func (vm *VM) initHomeKit() {
 
 			go t.Start()
 		case "temperature_sensor":
-			// Hmmm just throwin in random values (sound reasonable to a Finnish guy)
-			acc := accessory.NewTemperatureSensor(*info, 0, -40, 130, 0.1)
+			// Reasonable values for example for DHT22 sensors
+			acc := accessory.NewTemperatureSensor(*info, 0, -40, 80, 0.1)
+			config := hc.Config{Pin: pin, StoragePath: vm.dataDir + "/homekit/" + info.Name}
+			t, err := hc.NewIPTransport(config, acc.Accessory)
+			if err != nil {
+				log.Panic(err)
+			}
+
+			hc.OnTermination(func() {
+				t.Stop()
+			})
+
+			homeKitTransports = append(homeKitTransports, t)
+			devices[id] = acc
+
+			go t.Start()
+		case "humidity_sensor":
+			acc := NewHomeKitHumiditySensor(*info, 0, 0, 100, 0.1)
 			config := hc.Config{Pin: pin, StoragePath: vm.dataDir + "/homekit/" + info.Name}
 			t, err := hc.NewIPTransport(config, acc.Accessory)
 			if err != nil {
@@ -97,7 +113,6 @@ func (vm *VM) initHomeKit() {
 
 			go t.Start()
 		case "door":
-			// Hmmm just throwin in random values (sound reasonable to a Finnish guy)
 			acc := NewHomeKitDoor(*info)
 			config := hc.Config{Pin: pin, StoragePath: vm.dataDir + "/homekit/" + info.Name}
 			t, err := hc.NewIPTransport(config, acc.Accessory)
@@ -186,6 +201,18 @@ func (vm *VM) initHomeKit() {
 		switch device.(type) {
 		case *accessory.Thermometer:
 			device.(*accessory.Thermometer).TempSensor.CurrentTemperature.SetValue(value)
+		}
+		return goja.Null()
+	})
+
+	vm.Set("_set_homekit_device_humidity", func(call goja.FunctionCall) goja.Value {
+		id := call.Argument(0).String()
+		value := call.Argument(1).ToFloat()
+		device := devices[id]
+
+		switch device.(type) {
+		case *HomeKitHumiditySensor:
+			device.(*HomeKitHumiditySensor).HumiditySensor.CurrentRelativeHumidity.SetValue(value)
 		}
 		return goja.Null()
 	})
