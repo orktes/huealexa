@@ -84,6 +84,10 @@ HomeKit.prototype = {
       _set_homekit_device_temperature(id, state.temp);
     }
 
+    if ('humidity' in state) {
+      _set_homekit_device_humidity(id, state.humidity);
+    }
+
     if ('lux' in state) {
       _set_homekit_device_lux(id, state.lux);
     }
