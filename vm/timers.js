@@ -23,7 +23,7 @@ exports.setTimeout = function (cb, timeout) {
 };
 
 exports.setInterval = function (cb, interval) {
-  return createTimer(cb, timeout, -1);
+  return createTimer(cb, interval, -1);
 };
 
 exports.clear = function (id) {
