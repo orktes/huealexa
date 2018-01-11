@@ -17,6 +17,8 @@ func (vm *VM) initDRA() {
 		d.Close()
 	}
 
+	draMap = map[string]*dra.DRA{}
+
 	sendError := func(id string, err error) {
 		errorJSON, err := json.Marshal(err.Error())
 		if err != nil {
@@ -62,6 +64,11 @@ func (vm *VM) initDRA() {
 		addr := call.Argument(1).String()
 		go func() {
 			d, err := dra.NewFromAddr(addr)
+			if err != nil {
+				sendError(id, err)
+				return
+			}
+
 			d.OnUpdate = make(chan string, 10)
 			if err != nil {
 				sendError(id, err)

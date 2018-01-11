@@ -17,6 +17,8 @@ func (vm *VM) initWebSocket() {
 		webSocket.Close()
 	}
 
+	webSocketMap = map[string]*websocket.Conn{}
+
 	sendError := func(id string, err error) {
 		errorJSON, err := json.Marshal(err.Error())
 		if err != nil {
