@@ -14,6 +14,7 @@ func (o *objectGoMapSimple) init() {
 	o.baseObject.init()
 	o.prototype = o.val.runtime.global.ObjectPrototype
 	o.class = classObject
+	o.extensible = true
 }
 
 func (o *objectGoMapSimple) _get(n Value) Value {
@@ -73,8 +74,9 @@ func (o *objectGoMapSimple) _has(n Value) bool {
 func (o *objectGoMapSimple) putStr(name string, val Value, throw bool) {
 	if o.extensible || o._hasStr(name) {
 		o.data[name] = val.Export()
+	} else {
+		o.val.runtime.typeErrorResult(throw, "Host object is not extensible")
 	}
-	o.val.runtime.typeErrorResult(throw, "Host object is not extensible")
 }
 
 func (o *objectGoMapSimple) hasProperty(n Value) bool {
@@ -104,12 +106,12 @@ func (o *objectGoMapSimple) _putProp(name string, value Value, writable, enumera
 	return value
 }
 
-func (o *objectGoMapSimple) defineOwnProperty(name Value, descr objectImpl, throw bool) bool {
-	if descr.hasPropertyStr("get") || descr.hasPropertyStr("set") {
+func (o *objectGoMapSimple) defineOwnProperty(name Value, descr propertyDescr, throw bool) bool {
+	if descr.Getter != nil || descr.Setter != nil {
 		o.val.runtime.typeErrorResult(throw, "Host objects do not support accessor properties")
 		return false
 	}
-	o.put(name, descr.getStr("value"), throw)
+	o.put(name, descr.Value, throw)
 	return true
 }
 

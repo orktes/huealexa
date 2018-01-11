@@ -86,11 +86,12 @@ func (r *Runtime) builtinJSON_decodeObject(d *json.Decoder) (*Object, error) {
 		}
 
 		if key == "__proto__" {
-			descr := r.NewObject().self
-			descr.putStr("value", value, false)
-			descr.putStr("writable", valueTrue, false)
-			descr.putStr("enumerable", valueTrue, false)
-			descr.putStr("configurable", valueTrue, false)
+			descr := propertyDescr{
+				Value:        value,
+				Writable:     FLAG_TRUE,
+				Enumerable:   FLAG_TRUE,
+				Configurable: FLAG_TRUE,
+			}
 			object.self.defineOwnProperty(string__proto__, descr, false)
 		} else {
 			object.self.putStr(key, value, false)
@@ -266,12 +267,16 @@ func (r *Runtime) builtinJSON_stringify(call FunctionCall) Value {
 		}
 	}
 
-	holder := r.NewObject()
-	holder.self.putStr("", call.Argument(0), false)
-	if ctx.str(stringEmpty, holder) {
+	if ctx.do(call.Argument(0)) {
 		return newStringValue(ctx.buf.String())
 	}
 	return _undefined
+}
+
+func (ctx *_builtinJSON_stringifyContext) do(v Value) bool {
+	holder := ctx.r.NewObject()
+	holder.self.putStr("", v, false)
+	return ctx.str(stringEmpty, holder)
 }
 
 func (ctx *_builtinJSON_stringifyContext) str(key Value, holder *Object) bool {
@@ -307,6 +312,13 @@ func (ctx *_builtinJSON_stringifyContext) str(key Value, holder *Object) bool {
 		case *objectGoReflect:
 			if o1.toJson != nil {
 				value = ctx.r.ToValue(o1.toJson())
+			} else if v, ok := o1.origValue.Interface().(json.Marshaler); ok {
+				b, err := v.MarshalJSON()
+				if err != nil {
+					panic(err)
+				}
+				ctx.buf.Write(b)
+				return true
 			} else {
 				switch o1.className() {
 				case classNumber:

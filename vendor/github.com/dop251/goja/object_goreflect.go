@@ -195,23 +195,23 @@ func (o *objectGoReflect) _putProp(name string, value Value, writable, enumerabl
 	return o.baseObject._putProp(name, value, writable, enumerable, configurable)
 }
 
-func (r *Runtime) checkHostObjectPropertyDescr(name string, descr objectImpl, throw bool) bool {
-	if descr.hasPropertyStr("get") || descr.hasPropertyStr("set") {
+func (r *Runtime) checkHostObjectPropertyDescr(name string, descr propertyDescr, throw bool) bool {
+	if descr.Getter != nil || descr.Setter != nil {
 		r.typeErrorResult(throw, "Host objects do not support accessor properties")
 		return false
 	}
-	if wr := descr.getStr("writable"); wr != nil && !wr.ToBoolean() {
+	if descr.Writable == FLAG_FALSE {
 		r.typeErrorResult(throw, "Host object field %s cannot be made read-only", name)
 		return false
 	}
-	if cfg := descr.getStr("configurable"); cfg != nil && cfg.ToBoolean() {
+	if descr.Configurable == FLAG_TRUE {
 		r.typeErrorResult(throw, "Host object field %s cannot be made configurable", name)
 		return false
 	}
 	return true
 }
 
-func (o *objectGoReflect) defineOwnProperty(n Value, descr objectImpl, throw bool) bool {
+func (o *objectGoReflect) defineOwnProperty(n Value, descr propertyDescr, throw bool) bool {
 	name := n.String()
 	if ast.IsExported(name) {
 		if o.value.Kind() == reflect.Struct {
@@ -219,7 +219,7 @@ func (o *objectGoReflect) defineOwnProperty(n Value, descr objectImpl, throw boo
 				if !o.val.runtime.checkHostObjectPropertyDescr(name, descr, throw) {
 					return false
 				}
-				val := descr.getStr("value")
+				val := descr.Value
 				if val == nil {
 					val = _undefined
 				}
@@ -415,13 +415,11 @@ func (r *Runtime) buildFieldInfo(t reflect.Type, index []int, info *reflectTypeI
 	n := t.NumField()
 	for i := 0; i < n; i++ {
 		field := t.Field(i)
-		var name string
-		if r.fieldNameMapper == nil {
-			name = field.Name
-			if !ast.IsExported(name) {
-				continue
-			}
-		} else {
+		name := field.Name
+		if !ast.IsExported(name) {
+			continue
+		}
+		if r.fieldNameMapper != nil {
 			name = r.fieldNameMapper.FieldName(t, field)
 			if name == "" {
 				continue
@@ -445,7 +443,13 @@ func (r *Runtime) buildFieldInfo(t reflect.Type, index []int, info *reflectTypeI
 			Anonymous: field.Anonymous,
 		}
 		if field.Anonymous {
-			r.buildFieldInfo(field.Type, idx, info)
+			typ := field.Type
+			for typ.Kind() == reflect.Ptr {
+				typ = typ.Elem()
+			}
+			if typ.Kind() == reflect.Struct {
+				r.buildFieldInfo(typ, idx, info)
+			}
 		}
 	}
 }
@@ -464,13 +468,11 @@ func (r *Runtime) buildTypeInfo(t reflect.Type) (info *reflectTypeInfo) {
 	info.MethodNames = make([]string, 0, n)
 	for i := 0; i < n; i++ {
 		method := t.Method(i)
-		var name string
-		if r.fieldNameMapper == nil {
-			name = method.Name
-			if !ast.IsExported(name) {
-				continue
-			}
-		} else {
+		name := method.Name
+		if !ast.IsExported(name) {
+			continue
+		}
+		if r.fieldNameMapper != nil {
 			name = r.fieldNameMapper.MethodName(t, method)
 			if name == "" {
 				continue

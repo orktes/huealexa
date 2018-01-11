@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/dop251/goja/parser"
 	"go/ast"
 	"math"
 	"math/rand"
 	"reflect"
 	"strconv"
+
+	js_ast "github.com/dop251/goja/ast"
+	"github.com/dop251/goja/parser"
 )
 
 const (
@@ -18,6 +20,7 @@ const (
 
 var (
 	typeCallable = reflect.TypeOf(Callable(nil))
+	typeValue    = reflect.TypeOf((*Value)(nil)).Elem()
 )
 
 type global struct {
@@ -69,6 +72,25 @@ type global struct {
 	throwerProperty Value
 }
 
+type Flag int
+
+const (
+	FLAG_NOT_SET Flag = iota
+	FLAG_FALSE
+	FLAG_TRUE
+)
+
+func (f Flag) Bool() bool {
+	return f == FLAG_TRUE
+}
+
+func ToFlag(b bool) Flag {
+	if b {
+		return FLAG_TRUE
+	}
+	return FLAG_FALSE
+}
+
 type RandSource func() float64
 
 type Runtime struct {
@@ -89,8 +111,39 @@ type stackFrame struct {
 	pc       int
 }
 
-func (f stackFrame) position() Position {
+func (f *stackFrame) position() Position {
 	return f.prg.src.Position(f.prg.sourceOffset(f.pc))
+}
+
+func (f *stackFrame) write(b *bytes.Buffer) {
+	if f.prg != nil {
+		if n := f.prg.funcName; n != "" {
+			b.WriteString(n)
+			b.WriteString(" (")
+		}
+		if n := f.prg.src.name; n != "" {
+			b.WriteString(n)
+		} else {
+			b.WriteString("<eval>")
+		}
+		b.WriteByte(':')
+		b.WriteString(f.position().String())
+		b.WriteByte('(')
+		b.WriteString(strconv.Itoa(f.pc))
+		b.WriteByte(')')
+		if f.prg.funcName != "" {
+			b.WriteByte(')')
+		}
+	} else {
+		if f.funcName != "" {
+			b.WriteString(f.funcName)
+			b.WriteString(" (")
+		}
+		b.WriteString("native")
+		if f.funcName != "" {
+			b.WriteByte(')')
+		}
+	}
 }
 
 type Exception struct {
@@ -107,6 +160,44 @@ func (e *InterruptedError) Value() interface{} {
 	return e.iface
 }
 
+func (e *InterruptedError) String() string {
+	if e == nil {
+		return "<nil>"
+	}
+	var b bytes.Buffer
+	if e.iface != nil {
+		b.WriteString(fmt.Sprint(e.iface))
+		b.WriteByte('\n')
+	}
+	e.writeFullStack(&b)
+	return b.String()
+}
+
+func (e *InterruptedError) Error() string {
+	if e == nil || e.iface == nil {
+		return "<nil>"
+	}
+	var b bytes.Buffer
+	b.WriteString(fmt.Sprint(e.iface))
+	e.writeShortStack(&b)
+	return b.String()
+}
+
+func (e *Exception) writeFullStack(b *bytes.Buffer) {
+	for _, frame := range e.stack {
+		b.WriteString("\tat ")
+		frame.write(b)
+		b.WriteByte('\n')
+	}
+}
+
+func (e *Exception) writeShortStack(b *bytes.Buffer) {
+	if len(e.stack) > 0 && (e.stack[0].prg != nil || e.stack[0].funcName != "") {
+		b.WriteString(" at ")
+		e.stack[0].write(b)
+	}
+}
+
 func (e *Exception) String() string {
 	if e == nil {
 		return "<nil>"
@@ -114,40 +205,9 @@ func (e *Exception) String() string {
 	var b bytes.Buffer
 	if e.val != nil {
 		b.WriteString(e.val.String())
-	}
-	b.WriteByte('\n')
-	for _, frame := range e.stack {
-		b.WriteString("\tat ")
-		if frame.prg != nil {
-			if n := frame.prg.funcName; n != "" {
-				b.WriteString(n)
-				b.WriteString(" (")
-			}
-			if n := frame.prg.src.name; n != "" {
-				b.WriteString(n)
-			} else {
-				b.WriteString("<eval>")
-			}
-			b.WriteByte(':')
-			b.WriteString(frame.position().String())
-			b.WriteByte('(')
-			b.WriteString(strconv.Itoa(frame.pc))
-			b.WriteByte(')')
-			if frame.prg.funcName != "" {
-				b.WriteByte(')')
-			}
-		} else {
-			if frame.funcName != "" {
-				b.WriteString(frame.funcName)
-				b.WriteString(" (")
-			}
-			b.WriteString("native")
-			if frame.funcName != "" {
-				b.WriteByte(')')
-			}
-		}
 		b.WriteByte('\n')
 	}
+	e.writeFullStack(&b)
 	return b.String()
 }
 
@@ -155,7 +215,10 @@ func (e *Exception) Error() string {
 	if e == nil || e.val == nil {
 		return "<nil>"
 	}
-	return e.val.String()
+	var b bytes.Buffer
+	b.WriteString(e.val.String())
+	e.writeShortStack(&b)
+	return b.String()
 }
 
 func (e *Exception) Value() Value {
@@ -281,6 +344,11 @@ func (r *Runtime) NewObject() (v *Object) {
 	return r.newBaseObject(r.global.ObjectPrototype, classObject).val
 }
 
+// CreateObject creates an object with given prototype. Equivalent of Object.create(proto).
+func (r *Runtime) CreateObject(proto *Object) *Object {
+	return r.newBaseObject(proto, classObject).val
+}
+
 func (r *Runtime) NewTypeError(args ...interface{}) *Object {
 	msg := ""
 	if len(args) > 0 {
@@ -315,11 +383,13 @@ func (r *Runtime) newFunc(name string, len int, strict bool) (f *funcObject) {
 
 func (r *Runtime) newNativeFuncObj(v *Object, call func(FunctionCall) Value, construct func(args []Value) *Object, name string, proto *Object, length int) *nativeFuncObject {
 	f := &nativeFuncObject{
-		baseObject: baseObject{
-			class:      classFunction,
-			val:        v,
-			extensible: true,
-			prototype:  r.global.FunctionPrototype,
+		baseFuncObject: baseFuncObject{
+			baseObject: baseObject{
+				class:      classFunction,
+				val:        v,
+				extensible: true,
+				prototype:  r.global.FunctionPrototype,
+			},
 		},
 		f:         call,
 		construct: construct,
@@ -332,15 +402,49 @@ func (r *Runtime) newNativeFuncObj(v *Object, call func(FunctionCall) Value, con
 	return f
 }
 
+func (r *Runtime) newNativeConstructor(call func(ConstructorCall) *Object, name string, length int) *Object {
+	v := &Object{runtime: r}
+
+	f := &nativeFuncObject{
+		baseFuncObject: baseFuncObject{
+			baseObject: baseObject{
+				class:      classFunction,
+				val:        v,
+				extensible: true,
+				prototype:  r.global.FunctionPrototype,
+			},
+		},
+	}
+
+	f.f = func(c FunctionCall) Value {
+		return f.defaultConstruct(call, c.Arguments)
+	}
+
+	f.construct = func(args []Value) *Object {
+		return f.defaultConstruct(call, args)
+	}
+
+	v.self = f
+	f.init(name, length)
+
+	proto := r.NewObject()
+	proto.self._putProp("constructor", v, true, false, true)
+	f._putProp("prototype", proto, true, false, false)
+
+	return v
+}
+
 func (r *Runtime) newNativeFunc(call func(FunctionCall) Value, construct func(args []Value) *Object, name string, proto *Object, length int) *Object {
 	v := &Object{runtime: r}
 
 	f := &nativeFuncObject{
-		baseObject: baseObject{
-			class:      classFunction,
-			val:        v,
-			extensible: true,
-			prototype:  r.global.FunctionPrototype,
+		baseFuncObject: baseFuncObject{
+			baseObject: baseObject{
+				class:      classFunction,
+				val:        v,
+				extensible: true,
+				prototype:  r.global.FunctionPrototype,
+			},
 		},
 		f:         call,
 		construct: construct,
@@ -354,13 +458,15 @@ func (r *Runtime) newNativeFunc(call func(FunctionCall) Value, construct func(ar
 	return v
 }
 
-func (r *Runtime) newNativeFuncConstructObj(v *Object, construct func(args []Value, proto *Object) *Object, name string, proto *Object, length int) objectImpl {
+func (r *Runtime) newNativeFuncConstructObj(v *Object, construct func(args []Value, proto *Object) *Object, name string, proto *Object, length int) *nativeFuncObject {
 	f := &nativeFuncObject{
-		baseObject: baseObject{
-			class:      classFunction,
-			val:        v,
-			extensible: true,
-			prototype:  r.global.FunctionPrototype,
+		baseFuncObject: baseFuncObject{
+			baseObject: baseObject{
+				class:      classFunction,
+				val:        v,
+				extensible: true,
+				prototype:  r.global.FunctionPrototype,
+			},
 		},
 		f: r.constructWrap(construct, proto),
 		construct: func(args []Value) *Object {
@@ -591,7 +697,9 @@ func toUInt32(v Value) uint32 {
 	}
 
 	if f, ok := v.assertFloat(); ok {
-		return uint32(int64(f))
+		if !math.IsNaN(f) && !math.IsInf(f, 0) {
+			return uint32(int64(f))
+		}
 	}
 	return 0
 }
@@ -603,7 +711,9 @@ func toUInt16(v Value) uint16 {
 	}
 
 	if f, ok := v.assertFloat(); ok {
-		return uint16(int64(f))
+		if !math.IsNaN(f) && !math.IsInf(f, 0) {
+			return uint16(int64(f))
+		}
 	}
 	return 0
 }
@@ -655,8 +765,26 @@ func New() *Runtime {
 // Compile creates an internal representation of the JavaScript code that can be later run using the Runtime.RunProgram()
 // method. This representation is not linked to a runtime in any way and can be run in multiple runtimes (possibly
 // at the same time).
-func Compile(name, src string, strict bool) (p *Program, err error) {
+func Compile(name, src string, strict bool) (*Program, error) {
 	return compile(name, src, strict, false)
+}
+
+// CompileAST creates an internal representation of the JavaScript code that can be later run using the Runtime.RunProgram()
+// method. This representation is not linked to a runtime in any way and can be run in multiple runtimes (possibly
+// at the same time).
+func CompileAST(prg *js_ast.Program, strict bool) (*Program, error) {
+	return compileAST(prg, strict, false)
+}
+
+// MustCompile is like Compile but panics if the code cannot be compiled.
+// It simplifies safe initialization of global variables holding compiled JavaScript code.
+func MustCompile(name, src string, strict bool) *Program {
+	prg, err := Compile(name, src, strict)
+	if err != nil {
+		panic(err)
+	}
+
+	return prg
 }
 
 func compile(name, src string, strict, eval bool) (p *Program, err error) {
@@ -682,6 +810,12 @@ func compile(name, src string, strict, eval bool) (p *Program, err error) {
 		return
 	}
 
+	p, err = compileAST(prg, strict, eval)
+
+	return
+}
+
+func compileAST(prg *js_ast.Program, strict, eval bool) (p *Program, err error) {
 	c := newCompiler()
 	c.scope.strict = strict
 	c.scope.eval = eval
@@ -763,6 +897,7 @@ func (r *Runtime) RunProgram(p *Program) (result Value, err error) {
 	if recursive {
 		r.vm.popCtx()
 		r.vm.halt = false
+		r.vm.clearStack()
 	} else {
 		r.vm.stack = nil
 	}
@@ -817,6 +952,8 @@ func (r *Runtime) ToValue(i interface{}) Value {
 		}
 	case func(FunctionCall) Value:
 		return r.newNativeFunc(i, nil, "", nil, 0)
+	case func(ConstructorCall) *Object:
+		return r.newNativeConstructor(i, "", 0)
 	case int:
 		return intToValue(int64(i))
 	case int8:
@@ -833,18 +970,21 @@ func (r *Runtime) ToValue(i interface{}) Value {
 		} else {
 			return floatToValue(float64(i))
 		}
-	case uint64:
-		if i <= math.MaxInt64 {
-			return intToValue(int64(i))
-		} else {
-			return floatToValue(float64(i))
-		}
 	case uint8:
 		return intToValue(int64(i))
 	case uint16:
 		return intToValue(int64(i))
 	case uint32:
 		return intToValue(int64(i))
+	case uint64:
+		if i <= math.MaxInt64 {
+			return intToValue(int64(i))
+		}
+		return floatToValue(float64(i))
+	case float32:
+		return floatToValue(float64(i))
+	case float64:
+		return floatToValue(i)
 	case map[string]interface{}:
 		obj := &Object{runtime: r}
 		m := &objectGoMapSimple{
@@ -894,7 +1034,7 @@ func (r *Runtime) ToValue(i interface{}) Value {
 
 	switch value.Kind() {
 	case reflect.Map:
-		if value.Type().Name() == "" {
+		if value.Type().NumMethod() == 0 {
 			switch value.Type().Key().Kind() {
 			case reflect.String, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
@@ -951,17 +1091,24 @@ func (r *Runtime) wrapReflectFunc(value reflect.Value) func(FunctionCall) Value 
 	return func(call FunctionCall) Value {
 		typ := value.Type()
 		nargs := typ.NumIn()
-		if len(call.Arguments) != nargs {
-			if typ.IsVariadic() {
-				if len(call.Arguments) < nargs-1 {
-					panic(r.newError(r.global.TypeError, "expected at least %d arguments; got %d", nargs-1, len(call.Arguments)))
-				}
-			} else {
-				panic(r.newError(r.global.TypeError, "expected %d argument(s); got %d", nargs, len(call.Arguments)))
-			}
-		}
+		var in []reflect.Value
 
-		in := make([]reflect.Value, len(call.Arguments))
+		if l := len(call.Arguments); l < nargs {
+			// fill missing arguments with zero values
+			n := nargs
+			if typ.IsVariadic() {
+				n--
+			}
+			in = make([]reflect.Value, n)
+			for i := l; i < n; i++ {
+				in[i] = reflect.Zero(typ.In(i))
+			}
+		} else {
+			if l > nargs && !typ.IsVariadic() {
+				l = nargs
+			}
+			in = make([]reflect.Value, l)
+		}
 
 		callSlice := false
 		for i, a := range call.Arguments {
@@ -974,6 +1121,8 @@ func (r *Runtime) wrapReflectFunc(value reflect.Value) func(FunctionCall) Value 
 				}
 
 				t = typ.In(n).Elem()
+			} else if n > nargs-1 { // ignore extra arguments
+				break
 			} else {
 				t = typ.In(n)
 			}
@@ -1073,21 +1222,20 @@ func (r *Runtime) toReflectValue(v Value, typ reflect.Type) (reflect.Value, erro
 		return reflect.ValueOf(uint8(i)).Convert(typ), nil
 	}
 
-	t := reflect.TypeOf(v)
-	if t.AssignableTo(typ) {
-		return reflect.ValueOf(v), nil
-	} else if t.ConvertibleTo(typ) {
-		return reflect.ValueOf(v).Convert(typ), nil
-	}
-
 	if typ == typeCallable {
 		if fn, ok := AssertFunction(v); ok {
 			return reflect.ValueOf(fn), nil
 		}
 	}
 
-	et := v.ExportType()
+	if typ.Implements(typeValue) {
+		return reflect.ValueOf(v), nil
+	}
 
+	et := v.ExportType()
+	if et == nil {
+		return reflect.Zero(typ), nil
+	}
 	if et.AssignableTo(typ) {
 		return reflect.ValueOf(v.Export()), nil
 	} else if et.ConvertibleTo(typ) {
@@ -1222,6 +1370,11 @@ func (r *Runtime) ExportTo(v Value, target interface{}) error {
 	return nil
 }
 
+// GlobalObject returns the global object.
+func (r *Runtime) GlobalObject() *Object {
+	return r.globalObject
+}
+
 // Set the specified value as a property of the global object.
 // The value is first converted using ToValue()
 func (r *Runtime) Set(name string, value interface{}) {
@@ -1246,6 +1399,15 @@ func AssertFunction(v Value) (Callable, bool) {
 	if obj, ok := v.(*Object); ok {
 		if f, ok := obj.self.assertCallable(); ok {
 			return func(this Value, args ...Value) (ret Value, err error) {
+				defer func() {
+					if x := recover(); x != nil {
+						if ex, ok := x.(*InterruptedError); ok {
+							err = ex
+						} else {
+							panic(x)
+						}
+					}
+				}()
 				ex := obj.runtime.vm.try(func() {
 					ret = f(FunctionCall{
 						This:      this,
@@ -1255,6 +1417,7 @@ func AssertFunction(v Value) (Callable, bool) {
 				if ex != nil {
 					err = ex
 				}
+				obj.runtime.vm.clearStack()
 				return
 			}, true
 		}
@@ -1280,5 +1443,28 @@ func Undefined() Value {
 
 // Null returns JS null value.
 func Null() Value {
-	return _undefined
+	return _null
+}
+
+func tryFunc(f func()) (err error) {
+	defer func() {
+		if x := recover(); x != nil {
+			switch x := x.(type) {
+			case *Exception:
+				err = x
+			case *InterruptedError:
+				err = x
+			case Value:
+				err = &Exception{
+					val: x,
+				}
+			default:
+				panic(x)
+			}
+		}
+	}()
+
+	f()
+
+	return nil
 }

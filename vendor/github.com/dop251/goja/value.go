@@ -708,19 +708,61 @@ func (o *Object) Get(name string) Value {
 	return o.self.getStr(name)
 }
 
-func (o *Object) Set(name string, value interface{}) (err error) {
-	defer func() {
-		if x := recover(); x != nil {
-			if ex, ok := x.(*Exception); ok {
-				err = ex
-			} else {
-				panic(x)
-			}
-		}
-	}()
+func (o *Object) Keys() (keys []string) {
+	for item, f := o.self.enumerate(false, false)(); f != nil; item, f = f() {
+		keys = append(keys, item.name)
+	}
 
-	o.self.putStr(name, o.runtime.ToValue(value), true)
 	return
+}
+
+// DefineDataProperty is a Go equivalent of Object.defineProperty(o, name, {value: value, writable: writable,
+// configurable: configurable, enumerable: enumerable})
+func (o *Object) DefineDataProperty(name string, value Value, writable, configurable, enumerable Flag) error {
+	return tryFunc(func() {
+		o.self.defineOwnProperty(newStringValue(name), propertyDescr{
+			Value:        value,
+			Writable:     writable,
+			Configurable: configurable,
+			Enumerable:   enumerable,
+		}, true)
+	})
+}
+
+// DefineAccessorProperty is a Go equivalent of Object.defineProperty(o, name, {get: getter, set: setter,
+// configurable: configurable, enumerable: enumerable})
+func (o *Object) DefineAccessorProperty(name string, getter, setter Value, configurable, enumerable Flag) error {
+	return tryFunc(func() {
+		o.self.defineOwnProperty(newStringValue(name), propertyDescr{
+			Getter:       getter,
+			Setter:       setter,
+			Configurable: configurable,
+			Enumerable:   enumerable,
+		}, true)
+	})
+}
+
+func (o *Object) Set(name string, value interface{}) error {
+	return tryFunc(func() {
+		o.self.putStr(name, o.runtime.ToValue(value), true)
+	})
+}
+
+// MarshalJSON returns JSON representation of the Object. It is equivalent to JSON.stringify(o).
+// Note, this implements json.Marshaler so that json.Marshal() can be used without the need to Export().
+func (o *Object) MarshalJSON() ([]byte, error) {
+	ctx := _builtinJSON_stringifyContext{
+		r: o.runtime,
+	}
+	ex := o.runtime.vm.try(func() {
+		if !ctx.do(o) {
+			ctx.buf.WriteString("null")
+		}
+	})
+	if ex != nil {
+		return nil, ex
+	}
+	return ctx.buf.Bytes(), nil
 }
 
 func (o valueUnresolved) throw() {

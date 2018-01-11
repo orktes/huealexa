@@ -21,6 +21,14 @@ type Object struct {
 
 type iterNextFunc func() (propIterItem, iterNextFunc)
 
+type propertyDescr struct {
+	Value Value
+
+	Writable, Configurable, Enumerable Flag
+
+	Getter, Setter Value
+}
+
 type objectImpl interface {
 	sortable
 	className() string
@@ -36,12 +44,11 @@ type objectImpl interface {
 	hasOwnProperty(Value) bool
 	hasOwnPropertyStr(string) bool
 	_putProp(name string, value Value, writable, enumerable, configurable bool) Value
-	defineOwnProperty(name Value, descr objectImpl, throw bool) bool
+	defineOwnProperty(name Value, descr propertyDescr, throw bool) bool
 	toPrimitiveNumber() Value
 	toPrimitiveString() Value
 	toPrimitive() Value
 	assertCallable() (call func(FunctionCall) Value, ok bool)
-	// defineOwnProperty(Value, property, bool) bool
 	deleteStr(name string, throw bool) bool
 	delete(name Value, throw bool) bool
 	proto() *Object
@@ -53,10 +60,6 @@ type objectImpl interface {
 	export() interface{}
 	exportType() reflect.Type
 	equal(objectImpl) bool
-
-	// clone(*_object, *_object, *_clone) *_object
-	// marshalJSON() json.Marshaler
-
 }
 
 type baseObject struct {
@@ -67,16 +70,6 @@ type baseObject struct {
 
 	values    map[string]Value
 	propNames []string
-}
-
-type funcObject struct {
-	baseObject
-
-	nameProp, lenProp valueProperty
-
-	stash *stash
-	prg   *Program
-	src   string
 }
 
 type primitiveValueObject struct {
@@ -97,6 +90,11 @@ type FunctionCall struct {
 	Arguments []Value
 }
 
+type ConstructorCall struct {
+	This      *Object
+	Arguments []Value
+}
+
 func (f FunctionCall) Argument(idx int) Value {
 	if idx < len(f.Arguments) {
 		return f.Arguments[idx]
@@ -104,23 +102,11 @@ func (f FunctionCall) Argument(idx int) Value {
 	return _undefined
 }
 
-type nativeFuncObject struct {
-	baseObject
-	nameProp, lenProp valueProperty
-	f                 func(FunctionCall) Value
-	construct         func(args []Value) *Object
-}
-
-func (f *nativeFuncObject) export() interface{} {
-	return f.f
-}
-
-func (f *nativeFuncObject) exportType() reflect.Type {
-	return reflect.TypeOf(f.f)
-}
-
-type boundFuncObject struct {
-	nativeFuncObject
+func (f ConstructorCall) Argument(idx int) Value {
+	if idx < len(f.Arguments) {
+		return f.Arguments[idx]
+	}
+	return _undefined
 }
 
 func (o *baseObject) init() {
@@ -300,35 +286,10 @@ func (o *baseObject) hasOwnPropertyStr(name string) bool {
 	return v != nil
 }
 
-func (o *baseObject) _defineOwnProperty(name Value, existingValue Value, descr objectImpl, throw bool) (val Value, ok bool) {
-	var hasWritable, hasEnumerable, hasConfigurable bool
-	var writable, enumerable, configurable bool
+func (o *baseObject) _defineOwnProperty(name, existingValue Value, descr propertyDescr, throw bool) (val Value, ok bool) {
 
-	value := descr.getStr("value")
-
-	if p := descr.getStr("writable"); p != nil {
-		hasWritable = true
-		writable = p.ToBoolean()
-	}
-	if p := descr.getStr("enumerable"); p != nil {
-		hasEnumerable = true
-		enumerable = p.ToBoolean()
-	}
-	if p := descr.getStr("configurable"); p != nil {
-		hasConfigurable = true
-		configurable = p.ToBoolean()
-	}
-
-	getter := descr.getStr("get")
-	setter := descr.getStr("set")
-
-	if (getter != nil || setter != nil) && (value != nil || hasWritable) {
-		o.val.runtime.typeErrorResult(throw, "Invalid property descriptor. Cannot both specify accessors and a value or writable attribute")
-		return nil, false
-	}
-
-	getterObj, _ := getter.(*Object)
-	setterObj, _ := setter.(*Object)
+	getterObj, _ := descr.Getter.(*Object)
+	setterObj, _ := descr.Setter.(*Object)
 
 	var existing *valueProperty
 
@@ -349,69 +310,69 @@ func (o *baseObject) _defineOwnProperty(name Value, existingValue Value, descr o
 		}
 
 		if !existing.configurable {
-			if configurable {
+			if descr.Configurable == FLAG_TRUE {
 				goto Reject
 			}
-			if hasEnumerable && enumerable != existing.enumerable {
+			if descr.Enumerable != FLAG_NOT_SET && descr.Enumerable.Bool() != existing.enumerable {
 				goto Reject
 			}
 		}
-		if existing.accessor && value != nil || !existing.accessor && (getterObj != nil || setterObj != nil) {
+		if existing.accessor && descr.Value != nil || !existing.accessor && (getterObj != nil || setterObj != nil) {
 			if !existing.configurable {
 				goto Reject
 			}
 		} else if !existing.accessor {
 			if !existing.configurable {
 				if !existing.writable {
-					if writable {
+					if descr.Writable == FLAG_TRUE {
 						goto Reject
 					}
-					if value != nil && !value.SameAs(existing.value) {
+					if descr.Value != nil && !descr.Value.SameAs(existing.value) {
 						goto Reject
 					}
 				}
 			}
 		} else {
 			if !existing.configurable {
-				if getter != nil && existing.getterFunc != getterObj || setter != nil && existing.setterFunc != setterObj {
+				if descr.Getter != nil && existing.getterFunc != getterObj || descr.Setter != nil && existing.setterFunc != setterObj {
 					goto Reject
 				}
 			}
 		}
 	}
 
-	if writable && enumerable && configurable && value != nil {
-		return value, true
+	if descr.Writable == FLAG_TRUE && descr.Enumerable == FLAG_TRUE && descr.Configurable == FLAG_TRUE && descr.Value != nil {
+		return descr.Value, true
 	}
 
-	if hasWritable {
-		existing.writable = writable
+	if descr.Writable != FLAG_NOT_SET {
+		existing.writable = descr.Writable.Bool()
 	}
-	if hasEnumerable {
-		existing.enumerable = enumerable
+	if descr.Enumerable != FLAG_NOT_SET {
+		existing.enumerable = descr.Enumerable.Bool()
 	}
-	if hasConfigurable {
-		existing.configurable = configurable
+	if descr.Configurable != FLAG_NOT_SET {
+		existing.configurable = descr.Configurable.Bool()
 	}
 
-	if value != nil {
-		existing.value = value
+	if descr.Value != nil {
+		existing.value = descr.Value
 		existing.getterFunc = nil
 		existing.setterFunc = nil
 	}
 
-	if value != nil || hasWritable {
+	if descr.Value != nil || descr.Writable != FLAG_NOT_SET {
 		existing.accessor = false
 	}
 
-	if getter != nil {
-		existing.getterFunc = propGetter(o.val, getter, o.val.runtime)
+	if descr.Getter != nil {
+		existing.getterFunc = propGetter(o.val, descr.Getter, o.val.runtime)
 		existing.value = nil
 		existing.accessor = true
 	}
 
-	if setter != nil {
-		existing.setterFunc = propSetter(o.val, setter, o.val.runtime)
+	if descr.Setter != nil {
+		existing.setterFunc = propSetter(o.val, descr.Setter, o.val.runtime)
 		existing.value = nil
 		existing.accessor = true
 	}
@@ -425,14 +386,15 @@ func (o *baseObject) _defineOwnProperty(name Value, existingValue Value, descr o
 Reject:
 	o.val.runtime.typeErrorResult(throw, "Cannot redefine property: %s", name.ToString())
 	return nil, false
+
 }
 
-func (o *baseObject) defineOwnProperty(n Value, descr objectImpl, throw bool) bool {
+func (o *baseObject) defineOwnProperty(n Value, descr propertyDescr, throw bool) bool {
 	name := n.String()
-	val := o.values[name]
-	if v, ok := o._defineOwnProperty(n, val, descr, throw); ok {
+	existingVal := o.values[name]
+	if v, ok := o._defineOwnProperty(n, existingVal, descr, throw); ok {
 		o.values[name] = v
-		if val == nil {
+		if existingVal == nil {
 			o.propNames = append(o.propNames, name)
 		}
 		return true
@@ -657,217 +619,7 @@ func (o *baseObject) equal(other objectImpl) bool {
 	return false
 }
 
-func (f *funcObject) getPropStr(name string) Value {
-	switch name {
-	case "prototype":
-		if _, exists := f.values["prototype"]; !exists {
-			return f.addPrototype()
-		}
-	}
-
-	return f.baseObject.getPropStr(name)
-}
-
-func (f *funcObject) addPrototype() Value {
-	proto := f.val.runtime.NewObject()
-	proto.self._putProp("constructor", f.val, true, false, true)
-	return f._putProp("prototype", proto, true, false, false)
-}
-
-func (f *funcObject) getProp(n Value) Value {
-	return f.getPropStr(n.String())
-}
-
-func (f *funcObject) hasOwnProperty(n Value) bool {
-	if r := f.baseObject.hasOwnProperty(n); r {
-		return true
-	}
-
-	name := n.String()
-	if name == "prototype" {
-		return true
-	}
-	return false
-}
-
-func (f *funcObject) hasOwnPropertyStr(name string) bool {
-	if r := f.baseObject.hasOwnPropertyStr(name); r {
-		return true
-	}
-
-	if name == "prototype" {
-		return true
-	}
-	return false
-}
-
-func (f *funcObject) construct(args []Value) *Object {
-	proto := f.getStr("prototype")
-	var protoObj *Object
-	if p, ok := proto.(*Object); ok {
-		protoObj = p
-	} else {
-		protoObj = f.val.runtime.global.ObjectPrototype
-	}
-	obj := f.val.runtime.newBaseObject(protoObj, classObject).val
-	ret := f.Call(FunctionCall{
-		This:      obj,
-		Arguments: args,
-	})
-
-	if ret, ok := ret.(*Object); ok {
-		return ret
-	}
-	return obj
-}
-
-func (f *funcObject) Call(call FunctionCall) Value {
-	vm := f.val.runtime.vm
-	pc := vm.pc
-	vm.push(f.val)
-	vm.push(call.This)
-	for _, arg := range call.Arguments {
-		vm.push(arg)
-	}
-	vm.pc = -1
-	vm.pushCtx()
-	vm.args = len(call.Arguments)
-	vm.prg = f.prg
-	vm.stash = f.stash
-	vm.pc = 0
-	vm.run()
-	vm.pc = pc
-	vm.halt = false
-	return vm.pop()
-}
-
-func (f *funcObject) export() interface{} {
-	return f.Call
-}
-
-func (f *funcObject) exportType() reflect.Type {
-	return reflect.TypeOf(f.Call)
-}
-
-func (f *funcObject) assertCallable() (func(FunctionCall) Value, bool) {
-	return f.Call, true
-}
-
-func (f *funcObject) init(name string, length int) {
-	f.baseObject.init()
-
-	f.nameProp.configurable = true
-	f.nameProp.value = newStringValue(name)
-	f.values["name"] = &f.nameProp
-
-	f.lenProp.configurable = true
-	f.lenProp.value = valueInt(length)
-	f.values["length"] = &f.lenProp
-}
-
 func (o *baseObject) hasInstance(v Value) bool {
 	o.val.runtime.typeErrorResult(true, "Expecting a function in instanceof check, but got %s", o.val.ToString())
 	panic("Unreachable")
-}
-
-func (f *funcObject) hasInstance(v Value) bool {
-	return f._hasInstance(v)
-}
-
-func (f *nativeFuncObject) hasInstance(v Value) bool {
-	return f._hasInstance(v)
-}
-
-func (f *baseObject) _hasInstance(v Value) bool {
-	if v, ok := v.(*Object); ok {
-		o := f.val.self.getStr("prototype")
-		if o1, ok := o.(*Object); ok {
-			for {
-				v = v.self.proto()
-				if v == nil {
-					return false
-				}
-				if o1 == v {
-					return true
-				}
-			}
-		} else {
-			f.val.runtime.typeErrorResult(true, "prototype is not an object")
-		}
-	}
-
-	return false
-}
-
-func (f *nativeFuncObject) defaultConstruct(args []Value) Value {
-	proto := f.getStr("prototype")
-	var protoObj *Object
-	if p, ok := proto.(*Object); ok {
-		protoObj = p
-	} else {
-		protoObj = f.val.runtime.global.ObjectPrototype
-	}
-	obj := f.val.runtime.newBaseObject(protoObj, classObject).val
-	ret := f.f(FunctionCall{
-		This:      obj,
-		Arguments: args,
-	})
-
-	if ret, ok := ret.(*Object); ok {
-		return ret
-	}
-	return obj
-}
-
-func (f *nativeFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
-	if f.f != nil {
-		return f.f, true
-	}
-	return nil, false
-}
-
-func (f *nativeFuncObject) init(name string, length int) {
-	f.baseObject.init()
-
-	f.nameProp.configurable = true
-	f.nameProp.value = newStringValue(name)
-	f._put("name", &f.nameProp)
-
-	f.lenProp.configurable = true
-	f.lenProp.value = valueInt(length)
-	f._put("length", &f.lenProp)
-}
-
-func (f *boundFuncObject) getProp(n Value) Value {
-	return f.getPropStr(n.String())
-}
-
-func (f *boundFuncObject) getPropStr(name string) Value {
-	if name == "caller" || name == "arguments" {
-		//f.runtime.typeErrorResult(true, "'caller' and 'arguments' are restricted function properties and cannot be accessed in this context.")
-		return f.val.runtime.global.throwerProperty
-	}
-	return f.nativeFuncObject.getPropStr(name)
-}
-
-func (f *boundFuncObject) delete(n Value, throw bool) bool {
-	return f.deleteStr(n.String(), throw)
-}
-
-func (f *boundFuncObject) deleteStr(name string, throw bool) bool {
-	if name == "caller" || name == "arguments" {
-		return true
-	}
-	return f.nativeFuncObject.deleteStr(name, throw)
-}
-
-func (f *boundFuncObject) putStr(name string, val Value, throw bool) {
-	if name == "caller" || name == "arguments" {
-		f.val.runtime.typeErrorResult(true, "'caller' and 'arguments' are restricted function properties and cannot be accessed in this context.")
-	}
-	f.nativeFuncObject.putStr(name, val, throw)
-}
-
-func (f *boundFuncObject) put(n Value, val Value, throw bool) {
-	f.putStr(n.String(), val, throw)
 }

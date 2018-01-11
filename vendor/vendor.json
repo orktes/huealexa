@@ -154,9 +154,10 @@
 			"revision": "4009c9dc49dd8906bfd4d479c255470d6a477ce5"
 		},
 		{
-			"checksumSHA1": "qYzBsS2oprU8NKcjmP5JtdfR7Jo=",
+			"checksumSHA1": "8ieFtpoqbDngD7TA5Lx1GgBgIeA=",
 			"path": "github.com/dop251/goja",
-			"revision": "64bfa769d0e37a31b1d6a8407a4816b1ee5dedba"
+			"revision": "86862cf74a095d3fc57ad938304d5026bf2a4779",
+			"revisionTime": "2018-01-03T18:25:44Z"
 		},
 		{
 			"checksumSHA1": "L8OPNVab18Tmt/7ssTF6CjeyLlw=",

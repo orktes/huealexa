@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 	"sync"
+	"sync/atomic"
 )
 
 const (
@@ -111,7 +112,7 @@ type vm struct {
 	stashAllocs int
 	halt        bool
 
-	interrupt     bool
+	interrupted   uint32
 	interruptVal  interface{}
 	interruptLock sync.Mutex
 }
@@ -249,8 +250,10 @@ func (s *stash) createBinding(name string) {
 	if s.names == nil {
 		s.names = make(map[string]uint32)
 	}
-	s.names[name] = uint32(len(s.names))
-	s.values = append(s.values, _undefined)
+	if _, exists := s.names[name]; !exists {
+		s.names[name] = uint32(len(s.names))
+		s.values = append(s.values, _undefined)
+	}
 }
 
 func (s *stash) deleteBinding(name string) bool {
@@ -277,16 +280,20 @@ func (vm *vm) init() {
 
 func (vm *vm) run() {
 	vm.halt = false
-	for !vm.halt && !vm.interrupt {
+	interrupted := false
+	for !vm.halt {
+		if interrupted = atomic.LoadUint32(&vm.interrupted) != 0; interrupted {
+			break
+		}
 		vm.prg.code[vm.pc].exec(vm)
 	}
 
-	if vm.interrupt {
+	if interrupted {
 		vm.interruptLock.Lock()
 		v := &InterruptedError{
 			iface: vm.interruptVal,
 		}
-		vm.interrupt = false
+		atomic.StoreUint32(&vm.interrupted, 0)
 		vm.interruptVal = nil
 		vm.interruptLock.Unlock()
 		panic(v)
@@ -296,7 +303,7 @@ func (vm *vm) run() {
 func (vm *vm) Interrupt(v interface{}) {
 	vm.interruptLock.Lock()
 	vm.interruptVal = v
-	vm.interrupt = true
+	atomic.StoreUint32(&vm.interrupted, 1)
 	vm.interruptLock.Unlock()
 }
 
@@ -1082,10 +1089,11 @@ func (s setPropGetter) exec(vm *vm) {
 	obj := vm.r.toObject(vm.stack[vm.sp-2])
 	val := vm.stack[vm.sp-1]
 
-	descr := vm.r.NewObject().self
-	descr.putStr("get", val, false)
-	descr.putStr("configurable", valueTrue, false)
-	descr.putStr("enumerable", valueTrue, false)
+	descr := propertyDescr{
+		Getter:       val,
+		Configurable: FLAG_TRUE,
+		Enumerable:   FLAG_TRUE,
+	}
 
 	obj.self.defineOwnProperty(newStringValue(string(s)), descr, false)
 
@@ -1099,10 +1107,11 @@ func (s setPropSetter) exec(vm *vm) {
 	obj := vm.r.toObject(vm.stack[vm.sp-2])
 	val := vm.stack[vm.sp-1]
 
-	descr := vm.r.NewObject().self
-	descr.putStr("set", val, false)
-	descr.putStr("configurable", valueTrue, false)
-	descr.putStr("enumerable", valueTrue, false)
+	descr := propertyDescr{
+		Setter:       val,
+		Configurable: FLAG_TRUE,
+		Enumerable:   FLAG_TRUE,
+	}
 
 	obj.self.defineOwnProperty(newStringValue(string(s)), descr, false)
 
@@ -1828,6 +1837,14 @@ func (vm *vm) _nativeCall(f *nativeFuncObject, n int) {
 	}
 	vm.sp -= n + 1
 	vm.pc++
+}
+
+func (vm *vm) clearStack() {
+	stackTail := vm.stack[vm.sp:]
+	for i := range stackTail {
+		stackTail[i] = nil
+	}
+	vm.stack = vm.stack[:vm.sp]
 }
 
 type enterFunc uint32
