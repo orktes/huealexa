@@ -100,6 +100,17 @@ func (vm *VM) initDRA() {
 		return goja.Null()
 	})
 
+	vm.Set("_dra_send", func(call goja.FunctionCall) goja.Value {
+		id := call.Argument(0).String()
+		data := call.Argument(1).String()
+
+		if d, ok := draMap[id]; ok {
+			d.Send(data)
+		}
+
+		return goja.Null()
+	})
+
 	vm.Set("_dra_power", func(call goja.FunctionCall) goja.Value {
 		id := call.Argument(0).String()
 		power := call.Argument(1).ToBoolean()

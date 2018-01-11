@@ -18,6 +18,9 @@ DenonDRA.prototype = {
     setMute: function (val) {
         _dra_mute(this.id, val);
     },
+    send: function (val) {
+        _dra_send(val);
+    },
     close: function () {
         _close_dra(this.id);
     }
