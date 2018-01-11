@@ -81,6 +81,7 @@ func (vm *VM) register() {
 	vm.initZWay()
 	vm.initWebSocket()
 	vm.initWOL()
+	vm.initDRA()
 }
 
 func (vm *VM) startWatch() error {
