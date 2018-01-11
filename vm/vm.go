@@ -80,6 +80,7 @@ func (vm *VM) register() {
 	vm.initSSDP()
 	vm.initZWay()
 	vm.initWebSocket()
+	vm.initWOL()
 }
 
 func (vm *VM) startWatch() error {

@@ -3,7 +3,6 @@ var _ = require('lodash');
 var registry = require('registry');
 var http = require('http');
 
-
 function VieraTV(data) {
   this.data = data;
   this.host = data.Root.URLBase.Host;
