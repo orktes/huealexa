@@ -2,6 +2,8 @@ var registry = require('registry');
 var exec = require('process').exec;
 var server = require('server');
 
+require('./timers_example');
+
 registry.addDevice(registry.createDevice('Testing', registry.DimmableLamp, function (state, cb) {
   console.log('State changed - ' + JSON.stringify(state));
   return cb();
