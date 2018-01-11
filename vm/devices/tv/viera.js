@@ -12,6 +12,9 @@ VieraTV.prototype = {
   sendAction: function (action) {
     return this.sendRequest('command', 'X_SendKey', '<X_KeyEvent>'+action+'</X_KeyEvent>');
   },
+  setVolume: function (volume) {
+    return this.sendRequest('render', 'SetVolume', "<InstanceID>0</InstanceID><Channel>Master</Channel><DesiredVolume>"+volume+"</DesiredVolume>");
+  },
   sendRequest: function(type, action, command, options) {
     var url, urn;
     if (typeof this.host === 'undefined') return;
