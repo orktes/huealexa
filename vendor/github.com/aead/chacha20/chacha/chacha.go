@@ -4,7 +4,7 @@
 
 // Package chacha implements some low-level functions of the
 // ChaCha cipher family.
-package chacha
+package chacha // import "github.com/aead/chacha20/chacha"
 
 // NewCipher returns a new *chacha.Cipher implementing the ChaCha/X (X = 8, 12 or 20)
 // stream cipher. The nonce must be unique for one key for all time.

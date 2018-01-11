@@ -9,7 +9,7 @@
 // Package collate contains types for comparing and sorting Unicode strings
 // according to a given collation order.  Package locale provides a high-level
 // interface to collation. Users should typically use that package instead.
-package collate
+package collate // import "golang.org/x/text/collate"
 
 import (
 	"bytes"
